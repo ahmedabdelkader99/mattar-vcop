@@ -13,3 +13,7 @@ output "k8s_proxy_ip" {
 output "k8s_storage_ip" {
   value = module.kubernetes.k8storage
 }
+
+output "database" {
+  value = module.database.databaseIPs
+}

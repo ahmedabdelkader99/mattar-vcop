@@ -57,6 +57,55 @@ module "kubernetes" {
     k8storageCores = var.k8storageCores
 }
 
+module "database" {
+    source = "./modules/database"
+
+    pxTargetNode = var.pxTargetNode
+    clone = var.clone
+    prefix = var.prefix
+
+    clusterName = "k8sdatabase"
+    storage = var.defaultStorage
+    diskSize = var.diskSize
+    dbMem = var.masterMem
+    dbCores = var.masterCores
+
+    dbStartIP = var.dbStartIP
+    subnet = var.subnet
+    cidr = var.cidr
+    gateway = var.gateway
+    tag = var.tag
+
+    ciuser = var.ciuser
+    sshkeys = var.sshkeys
+
+    dbCount = 3  # Adjust as needed for your database count
+}
+
+module "dns" {
+    source = "./modules/database"
+
+    pxTargetNode = var.pxTargetNode
+    clone = var.clone
+    prefix = var.prefix
+
+    clusterName = "dns"
+    storage = var.defaultStorage
+    diskSize = var.diskSize
+    dbMem = var.masterMem
+    dbCores = var.masterCores
+
+    dbStartIP = var.dbStartIP
+    subnet = var.subnet
+    cidr = var.cidr
+    gateway = var.gateway
+    tag = var.tag
+
+    ciuser = var.ciuser
+    sshkeys = var.sshkeys
+
+    dbCount = 3  # Adjust as needed for your database count
+}
 
 module "srv" {
     source = "./modules/srv"

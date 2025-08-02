@@ -47,3 +47,8 @@ variable "k8sproxyCores" { type = number }
 
 variable "k8storageMem" { type = number }
 variable "k8storageCores" { type = number }
+
+
+## Database configuration
+# variable "dbCount" { type = number }
+# variable "clusterName" { type = string }

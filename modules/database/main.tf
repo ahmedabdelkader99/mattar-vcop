@@ -9,18 +9,19 @@ terraform {
 
 
 
-resource "proxmox_vm_qemu" "srv" {
-    name = "${var.srv_name}"
-    tags = "VPSie_VCOP_${var.srv_name}"
-    target_node = "${var.px_target_node}"
+resource "proxmox_vm_qemu" "db" {
+    count = var.dbCount
+    name = "${var.prefix}-${var.clusterName}0${count.index + 1}"
+    tags = "VPSie_VCOP_${var.prefix}_database_node_0${count.index + 1}"
+    target_node = "${var.pxTargetNode}"
     clone = "${var.clone}"
-    agent = var.srv_agent
-    os_type = "${var.os_type}"
-    memory = var.srv_memory
+    agent = var.agent
+    os_type = "${var.osType}"
+    memory = var.dbMem
     scsihw = "${var.scsihw}"
 
     cpu {
-        cores = var.srv_cores
+        cores = var.dbCores
         sockets = 1
         type = "x86-64-v2-AES"
     }
@@ -36,7 +37,7 @@ resource "proxmox_vm_qemu" "srv" {
             virtio {
                 virtio0 {
                     disk {
-                        size            = var.srv_dsize
+                        size            = var.diskSize
                         storage         = "${var.storage}"
                         iothread        = true
                         discard         = true
@@ -51,13 +52,13 @@ resource "proxmox_vm_qemu" "srv" {
         id = 0
         model = "virtio"
         bridge = "vmbr10"
-        tag = var.srv_tag
+        tag = var.tag
     }
 
     # Setup the ip address using cloud-init.
     boot = "order=virtio0"
     # Keep in mind to use the CIDR notation for the ip.
-    ipconfig0 = "ip=${var.srv_ip}/${var.srv_cidr},gw=${var.srv_gw}"
+    ipconfig0 = "ip=${var.subnet}.${var.dbStartIP + count.index}/${var.cidr},gw=${var.gateway}"
     ciuser = var.ciuser
     sshkeys = var.sshkeys
 }

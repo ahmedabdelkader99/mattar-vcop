@@ -1,30 +1,33 @@
 # Required variables
-variable "px_target_node" { type = string }
+variable "pxTargetNode" { type = string }
 
-variable "srv_name" { type = string }
 variable "clone" { type = string }
 
-variable "storage" { type = string }
-variable "srv_dsize" { type = number }
-variable "srv_memory" { type = number }
-variable "srv_cores" { type = number }
+variable "prefix" { type = string }
+variable "dbCount" { type = number }
 
-variable "srv_ip" { type = string }
-variable "srv_cidr" { type = number }
-variable "srv_gw" { type = string }
-variable "srv_tag" { type = number }
+variable "subnet" { type = string }
+variable "storage" { type = string }
+variable "diskSize" { type = number }
+variable "dbMem" { type = number }
+variable "dbCores" { type = number }
+
+variable "dbStartIP" { type = string }
+variable "cidr" { type = number }
+variable "gateway" { type = string }
+variable "tag" { type = number }
 
 variable "ciuser" { type = string }
 variable "sshkeys" { type = string }
-
+variable "clusterName" { type = string }
 
 # Default variables
-variable "os_type" { 
+variable "osType" { 
     type = string 
     default = "cloud-init"
     }
 
-variable "srv_agent" { 
+variable "agent" { 
     type = number 
     default = 1
     }
