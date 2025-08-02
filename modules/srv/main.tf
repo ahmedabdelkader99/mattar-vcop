@@ -11,7 +11,6 @@ terraform {
 
 resource "proxmox_vm_qemu" "srv" {
     name = "${var.srv_name}"
-    desc = "${var.srv_desc}"
     tags = "VPSie_VCOP_${var.srv_name}"
     target_node = "${var.px_target_node}"
     clone = "${var.clone}"

@@ -2,7 +2,6 @@
 variable "px_target_node" { type = string }
 
 variable "srv_name" { type = string }
-variable "srv_desc" { type = string }
 variable "clone" { type = string }
 
 variable "storage" { type = string }

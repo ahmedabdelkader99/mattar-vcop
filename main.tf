@@ -7,42 +7,6 @@ terraform {
   }
 }
 
-
-############# Varables #############
-# Proxmox variables
-variable "px_endpoint" { type = string }
-variable "px_user" { type = string }
-variable "px_password" { type = string }
-variable "px_target_node" { type = string }
-variable "px_tls" { type = bool }
-
-# Cluster variables
-variable "cluster_name" { type = string }
-variable "cluster_desc" { type = string }
-variable "cluster_clone" { type = string }
-variable "cluster_agent" { type = number }
-variable "cluster_os_type" { type = string }
-variable "cluster_scsihw" { type = string }
-variable "cluster_storage" { type = string }
-
-variable "cluster_ssh" { type = string }
-variable "cluster_subnet" { type = string }
-variable "cluster_gw" { type = string }
-variable "cluster_start_ip" { type = number }
-variable "cluster_cidr" { type = number }
-variable "cluster_tag" { type = number }
-
-variable "cluster_master_count" { type = number }
-variable "cluster_master_memory" { type = number }
-variable "cluster_master_cores" { type = number }
-variable "cluster_master_dsize" { type = number }
-
-variable "cluster_worker_count" { type = number }
-variable "cluster_worker_memory" { type = number }
-variable "cluster_worker_cores" { type = number }
-variable "cluster_worker_dsize" { type = number }
-####################################
-
 provider "proxmox" {
 
       pm_tls_insecure = var.px_tls
@@ -51,25 +15,69 @@ provider "proxmox" {
       pm_password = "${var.px_password}"
 }
 
+
+
+module "kubernetes" {
+    source = "./modules/kubernetes"
+
+    pxTargetNode = var.pxTargetNode
+    clone = var.clone
+    defaultStorage = var.defaultStorage
+    diskSize = var.diskSize
+    agent = var.agent
+    osType = var.osType
+    scsihw = var.scsihw
+    prefix = var.prefix
+
+    subnet = var.subnet
+    gateway = var.gateway
+    cidr = var.cidr
+    tag = var.tag
+    sshkeys = var.sshkeys
+    ciuser = var.ciuser
+
+    k8sStartIP = var.k8sStartIP
+    k8sProxyIP = var.k8sProxyIP
+    k8sStorageIP = var.k8sStorageIP
+
+    masterCount = var.masterCount
+    masterMem = var.masterMem
+    masterCores = var.masterCores
+    # masterDSize = var.masterDSize
+
+    workersCount = var.workersCount
+    workerMem = var.workerMem
+    workerCores = var.workerCores
+    # workerDSize = var.workerDSize
+
+    k8sproxyMem = var.k8sproxyMem
+    k8sproxyCores = var.k8sproxyCores
+
+    k8storageMem = var.k8storageMem
+    k8storageCores = var.k8storageCores
+}
+
+
 module "srv" {
     source = "./modules/srv"
     
     srv_name = "haproxy"
-    srv_desc = "This is a test server"
-    px_target_node = var.px_target_node
-    clone = var.cluster_clone
+    px_target_node = var.pxTargetNode
+    clone = var.clone
 
-    storage = var.cluster_storage
-    srv_dsize = var.cluster_master_dsize
-    srv_memory = var.cluster_master_memory
-    srv_cores = var.cluster_master_cores
+    storage = var.defaultStorage
+    srv_dsize = var.diskSize
+    srv_memory = var.masterMem
+    srv_cores = var.masterCores
 
     srv_ip = "11.1.1.99"
     srv_cidr = 24
-    srv_gw = var.cluster_gw
-    srv_tag = var.cluster_tag
+    srv_gw = var.gateway
+    srv_tag = var.tag
 
-    ciuser = "m4tt4r"
-    sshkeys = var.cluster_ssh
+    ciuser = var.ciuser
+    sshkeys = var.sshkeys
 
 }
+
+
