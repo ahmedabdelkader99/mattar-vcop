@@ -95,7 +95,7 @@ module "dns" {
     dbMem = var.masterMem
     dbCores = var.masterCores
 
-    dbStartIP = var.dbStartIP
+    dbStartIP = var.dnsStartIP
     subnet = var.subnet
     cidr = var.cidr
     gateway = var.gateway
@@ -119,7 +119,7 @@ module "srv" {
     srv_memory = var.masterMem
     srv_cores = var.masterCores
 
-    srv_ip = "11.1.1.99"
+    srv_ip = "11.1.1.198"
     srv_cidr = 24
     srv_gw = var.gateway
     srv_tag = var.tag

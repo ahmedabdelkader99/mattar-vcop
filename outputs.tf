@@ -17,3 +17,7 @@ output "k8s_storage_ip" {
 output "database" {
   value = module.database.databaseIPs
 }
+
+output "dns" {
+  value = module.dns.databaseIPs
+}

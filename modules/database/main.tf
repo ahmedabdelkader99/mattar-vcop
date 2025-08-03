@@ -9,10 +9,10 @@ terraform {
 
 
 
-resource "proxmox_vm_qemu" "db" {
+resource "proxmox_vm_qemu" "database" {
     count = var.dbCount
     name = "${var.prefix}-${var.clusterName}0${count.index + 1}"
-    tags = "VPSie_VCOP_${var.prefix}_database_node_0${count.index + 1}"
+    tags = "VPSie_VCOP_${var.prefix}_${var.clusterName}_0${count.index + 1}"
     target_node = "${var.pxTargetNode}"
     clone = "${var.clone}"
     agent = var.agent
