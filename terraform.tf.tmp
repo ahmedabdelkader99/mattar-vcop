@@ -1,7 +1,7 @@
 ## PX configuration
 px_endpoint = "https://10.116.21.71:8006/api2/json"
-px_user = "root@pam"
-px_password = "VPSie1234@"
+px_user = "accessUser"
+px_password = "password"
 pxTargetNode = "s1vpsie01"
 px_tls = true
 
@@ -29,7 +29,7 @@ dnsStartIP = 204
 proxyIP = 198
 templatesSrvIP = 111
 backupSrvIP = 220
-sshkeys = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCTEv94K1Fdq5Hksz6ltZGQAXtam8olX/BXzKLfai9PrAG9sEJdhNLqIdVj0Jffq2z3xw3oLaKNYmlb5zv4UYxeAG7AOIVKNXPTInbbpkbg5mO8iuLOdoCIDOqa5Zv9SdVCNWG+K45pXtKqHUUlyODOdsWn/JcvSL2vP1Np93qilvObA2ueXnDAEFKEbOrtiIZiyI/oxfX7VBWSfMQHFrJgNyiXphhj7xH/8iZeuXAF70q4x+a+hAP+hwqbHQbR15X68jypwfSBut199o+2pUNFqB8IMlCLwUzJH1ZG2Ho6tHeWMOfa1Nbzu5vbEtPjtUGw/qbmoJ94TI4z1mebiJiIxA1h9SJFZ85FmMwVopy5fso36Bz58OWUlFBBwj5brXapDI5AGXgDBvX1TE77Rl27xJ2J0UWnp9mLtC8HvWw/ea8ZFXMK1A9M8QHhyY/NTAJJM43C523GVVbdF/fcYnQq2ZyQHvMknR64cZqI0Qq1I5IhtHj6Qx1N3iuGaMqXdumOqTjmnSnIgT5HWOJwJpgjbHxIGFWjUtZUf1/q+aqQlPQBqRfeps6LPonF0nsXE3pZHQvXLo0bg01h5CbBZucjeTLJUwDUs8YibTnTwL7eTJEsUa5x5XEaqOlxaETbv59hwIDktH9KmiRdnCjpsjHKzicmA+3REnYzR8n93IqGJQ== amattar@proton.me"
+sshkeys = ""
 ciuser = "vpsie"
 
 ## Kubernetes cluster configuration
