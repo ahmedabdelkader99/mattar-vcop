@@ -8,7 +8,7 @@ This project provisions all the virtual machines (VMs) required for the VPSie VC
 - Access to a Proxmox server
 - API credentials for Proxmox
 - SSH key for VM access
-- Preconfigured Cloudinit template
+- Preconfigured Cloudinit template - [How to create cloudinit template](./docs/citemplate.md)
 
 ## How to use
 
@@ -42,6 +42,13 @@ This project provisions all the virtual machines (VMs) required for the VPSie VC
 
 6. **Check outputs:**
    - After apply, Terraform will print IPs and other details for your deployed resources.
+
+## What it Creates
+
+- Kubernetes Cluster
+- Database Cluster
+- DNS Cluster
+- HAProxy
 
 ## Project Structure
 
