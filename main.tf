@@ -67,8 +67,8 @@ module "database" {
     clusterName = "k8sdatabase"
     storage = var.defaultStorage
     diskSize = var.diskSize
-    dbMem = var.masterMem
-    dbCores = var.masterCores
+    dbMem = var.dbMem
+    dbCores = var.dbCores
 
     dbStartIP = var.dbStartIP
     subnet = var.subnet
@@ -92,8 +92,8 @@ module "dns" {
     clusterName = "dns"
     storage = var.defaultStorage
     diskSize = var.diskSize
-    dbMem = var.masterMem
-    dbCores = var.masterCores
+    dbMem = var.dnsMem
+    dbCores = var.dnsCores
 
     dbStartIP = var.dnsStartIP
     subnet = var.subnet
@@ -116,8 +116,8 @@ module "srv" {
 
     storage = var.defaultStorage
     srv_dsize = var.diskSize
-    srv_memory = var.masterMem
-    srv_cores = var.masterCores
+    srv_memory = var.haproxyMem
+    srv_cores = var.haproxyCores
 
     srv_ip = "11.1.1.198"
     srv_cidr = 24

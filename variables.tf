@@ -5,6 +5,7 @@ variable "px_password" { type = string }
 variable "pxTargetNode" { type = string }
 variable "px_tls" { type = bool }
 
+
 ## Clone variables
 variable "clone" { type = string }
 variable "defaultStorage" { type = string }
@@ -13,6 +14,7 @@ variable "osType" { type = string }
 variable "scsihw" { type = string }
 variable "prefix" { type = string }
 variable "diskSize" { type = number }
+
 
 ## Network configuration
 variable "subnet" { type = string }
@@ -30,6 +32,7 @@ variable "proxyIP" { type = number }
 variable "templatesSrvIP" { type = number }
 variable "backupSrvIP" { type = number }
 
+
 ## Kubernetes cluster configuration
 variable "masterCount" { type = number }
 variable "masterMem" { type = number }
@@ -44,11 +47,22 @@ variable "workerCores" { type = number }
 variable "k8sproxyMem" { type = number }
 variable "k8sproxyCores" { type = number }
 
-
 variable "k8storageMem" { type = number }
 variable "k8storageCores" { type = number }
 
 
 ## Database configuration
+variable "dbMem" { type = string }
+variable "dbCores" { type = string }
 # variable "dbCount" { type = number }
 # variable "clusterName" { type = string }
+
+
+## DNS configuration
+variable "dnsMem" { type = number }
+variable "dnsCores" { type = number }
+
+
+## HAProxy configuration
+variable "haproxyMem" { type = number }
+variable "haproxyCores" { type = number }
