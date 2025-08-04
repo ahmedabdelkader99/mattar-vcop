@@ -1,0 +1,66 @@
+## PX configuration
+px_endpoint    = "https://10.116.21.71:8006/api2/json"   # Proxmox API endpoint
+px_user        = "accessUser"                            # Username for Proxmox API authentication
+px_password    = "password"                              # Password for Proxmox API authentication
+pxTargetNode   = "s1vpsie01"                             # Target Proxmox node to create VMs on
+px_tls         = true                                    # Whether to use TLS (true/false) for API connection
+
+
+## Clone configuration
+clone          = "ci001"                                 # Name of the base VM/template to clone
+defaultStorage = "local"                                 # Proxmox storage location for VM disks
+agent          = 1                                       # Enable QEMU guest agent (1 = enabled)
+osType         = "cloud-init"                            # OS type of the VM, usually 'cloud-init' for automation
+scsihw         = "virtio-scsi-pci"                       # SCSI controller type for VM
+prefix         = "s1"                                    # Prefix to use when naming provisioned VMs
+diskSize       = 40                                      # Disk size in GB for each VM
+
+
+## Network configuration
+subnet         = "11.1.1"                                # Subnet for the VMs (excluding last octet)
+gateway        = "11.1.1.1"                              # Gateway IP for the subnet
+cidr           = 24                                      # CIDR notation for the subnet (e.g., /24)
+tag            = 1                                       # VLAN tag or network tag used in Proxmox
+k8sStartIP     = 190                                     # Starting IP address for Kubernetes nodes
+k8sProxyIP     = 196                                     # IP address for Kubernetes proxy
+k8sStorageIP   = 199                                     # IP address for Kubernetes storage
+dbStartIP      = 201                                     # Starting IP address for database VMs
+dnsStartIP     = 204                                     # Starting IP address for DNS VMs
+proxyIP        = 198                                     # IP address used by the HAproxy
+templatesSrvIP = 111                                     # IP address of the VM hosting templates
+backupSrvIP    = 220                                     # IP address of the backup server
+sshkeys        = ""                                      # SSH public key(s) to inject into VMs
+ciuser         = "vpsie"                                 # Default username for cloud-init VMs
+
+
+## Kubernetes cluster configuration
+masterCount    = 3                                       # Number of Kubernetes master nodes
+masterMem      = 4096                                    # Memory in MB for each master node
+masterCores    = 2                                       # CPU cores for each master node
+# masterDSize  = 40                                      # (Optional) Disk size for master nodes
+
+workersCount   = 3                                       # Number of Kubernetes worker nodes
+workerMem      = 4096                                    # Memory in MB for each worker node
+workerCores    = 2                                       # CPU cores for each worker node
+# workerDSize  = 40                                      # (Optional) Disk size for worker nodes
+
+k8sproxyMem    = 2048                                    # Memory in MB for Kubernetes proxy VM
+k8sproxyCores  = 2                                       # CPU cores for Kubernetes proxy VM
+
+k8storageMem   = 2048                                    # Memory in MB for Kubernetes storage VM
+k8storageCores = 2                                       # CPU cores for Kubernetes storage VM
+
+
+## Database configuration
+dbMem          = "2048"                                  # Memory in MB for database VM
+dbCores        = "2"                                     # CPU cores for database VM
+
+
+## DNS configuration
+dnsMem         = 2048                                    # Memory in MB for DNS server
+dnsCores       = 2                                       # CPU cores for DNS server
+
+
+## HAProxy configuration
+haproxyMem     = 2048                                    # Memory in MB for HAProxy VM
+haproxyCores   = 2                                       # CPU cores for HAProxy VM
