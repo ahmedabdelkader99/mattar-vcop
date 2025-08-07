@@ -57,7 +57,7 @@ resource "proxmox_vm_qemu" "srv" {
     # Setup the ip address using cloud-init.
     boot = "order=virtio0"
     # Keep in mind to use the CIDR notation for the ip.
-    ipconfig0 = "ip=${var.srv_ip}/${var.srv_cidr},gw=${var.srv_gw}"
+    ipconfig0 = "ip=${var.srv_subnet}.${var.srv_ip}/${var.srv_cidr},gw=${var.srv_gw}"
     ciuser = var.ciuser
     sshkeys = var.sshkeys
 }

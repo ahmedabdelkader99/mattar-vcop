@@ -119,8 +119,9 @@ module "srv" {
     srv_memory = var.haproxyMem
     srv_cores = var.haproxyCores
 
-    srv_ip = "11.1.1.198"
-    srv_cidr = 24
+    srv_subnet = var.subnet
+    srv_ip = var.proxyIP
+    srv_cidr = var.cidr
     srv_gw = var.gateway
     srv_tag = var.tag
 

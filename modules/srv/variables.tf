@@ -9,7 +9,8 @@ variable "srv_dsize" { type = number }
 variable "srv_memory" { type = number }
 variable "srv_cores" { type = number }
 
-variable "srv_ip" { type = string }
+variable "srv_ip" { type = number }
+variable "srv_subnet" { type = string }
 variable "srv_cidr" { type = number }
 variable "srv_gw" { type = string }
 variable "srv_tag" { type = number }
