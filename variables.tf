@@ -52,13 +52,14 @@ variable "k8storageCores" { type = number }
 
 
 ## Database configuration
-variable "dbMem" { type = string }
-variable "dbCores" { type = string }
-# variable "dbCount" { type = number }
+variable "dbCount" { type = number }
+variable "dbMem" { type = number }
+variable "dbCores" { type = number }
 # variable "clusterName" { type = string }
 
 
 ## DNS configuration
+variable "dnsCount" { type = number }
 variable "dnsMem" { type = number }
 variable "dnsCores" { type = number }
 

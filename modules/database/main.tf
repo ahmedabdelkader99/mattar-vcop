@@ -11,6 +11,7 @@ terraform {
 
 resource "proxmox_vm_qemu" "database" {
     count = var.dbCount
+    vmid = var.dbStartIP + count.index
     name = "${var.prefix}-${var.clusterName}0${count.index + 1}"
     tags = "VPSie_VCOP_${var.prefix}_${var.clusterName}_0${count.index + 1}"
     target_node = "${var.pxTargetNode}"

@@ -10,6 +10,7 @@ terraform {
 
 
 resource "proxmox_vm_qemu" "srv" {
+    vmid = var.srv_ip
     name = "${var.srv_name}"
     tags = "VPSie_VCOP_${var.srv_name}"
     target_node = "${var.px_target_node}"

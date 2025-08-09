@@ -11,6 +11,7 @@ terraform {
 
 resource "proxmox_vm_qemu" "master" {
     count = var.masterCount
+    vmid = var.k8sStartIP + count.index
     name = "${var.prefix}-master0${count.index + 1}"
     tags = "VPSie_VCOP_${var.prefix}_kubernetes_master_node_0${count.index + 1}"
     target_node = "${var.pxTargetNode}"
@@ -65,6 +66,7 @@ resource "proxmox_vm_qemu" "master" {
 
 resource "proxmox_vm_qemu" "worker" {
     count = var.workersCount
+    vmid = var.k8sStartIP + count.index + var.masterCount
     name = "${var.prefix}-worker0${count.index + 1}"
     tags = "VPSie_VCOP_${var.prefix}_kubernetes_worker_node_0${count.index + 1}"
     target_node = "${var.pxTargetNode}"
@@ -112,13 +114,14 @@ resource "proxmox_vm_qemu" "worker" {
     # Setup the ip address using cloud-init.
     boot = "order=virtio0"
     # Keep in mind to use the CIDR notation for the ip. - if doesn't work add masterCount insteadf of worker count
-    ipconfig0 = "ip=${var.subnet}.${var.k8sStartIP + count.index + var.workersCount}/${var.cidr},gw=${var.gateway}"
+    ipconfig0 = "ip=${var.subnet}.${var.k8sStartIP + count.index + var.masterCount}/${var.cidr},gw=${var.gateway}"
     ciuser = var.ciuser
     sshkeys = var.sshkeys
 }
 
 resource "proxmox_vm_qemu" "k8sproxy" {
     name = "${var.prefix}-k8sproxy"
+    vmid = var.k8sProxyIP
     tags = "VPSie_VCOP_${var.prefix}_kubernetes_proxy"
     target_node = "${var.pxTargetNode}"
     clone = "${var.clone}"
@@ -172,6 +175,7 @@ resource "proxmox_vm_qemu" "k8sproxy" {
 
 resource "proxmox_vm_qemu" "k8storage" {
     name = "${var.prefix}-k8storage"
+    vmid = var.k8sStorageIP
     tags = "VPSie_VCOP_${var.prefix}_kubernetes_storage"
     target_node = "${var.pxTargetNode}"
     clone = "${var.clone}"

@@ -79,7 +79,7 @@ module "database" {
     ciuser = var.ciuser
     sshkeys = var.sshkeys
 
-    dbCount = 3  # Adjust as needed for your database count
+    dbCount = var.dbCount
 }
 
 module "dns" {
@@ -104,10 +104,10 @@ module "dns" {
     ciuser = var.ciuser
     sshkeys = var.sshkeys
 
-    dbCount = 3  # Adjust as needed for your database count
+    dbCount = var.dnsCount
 }
 
-module "srv" {
+module "haproxy" {
     source = "./modules/srv"
     
     srv_name = "haproxy"
@@ -130,4 +130,26 @@ module "srv" {
 
 }
 
+# module "templateSrv" {
+#     source = "./modules/srv"
+    
+#     srv_name = "templateSrv"
+#     px_target_node = var.pxTargetNode
+#     clone = var.clone
+
+#     storage = var.defaultStorage
+#     srv_dsize = var.diskSize
+#     srv_memory = var.haproxyMem
+#     srv_cores = var.haproxyCores
+
+#     srv_subnet = var.subnet
+#     srv_ip = var.proxyIP
+#     srv_cidr = var.cidr
+#     srv_gw = var.gateway
+#     srv_tag = var.tag
+
+#     ciuser = var.ciuser
+#     sshkeys = var.sshkeys
+
+# }
 
