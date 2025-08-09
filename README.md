@@ -49,6 +49,7 @@ This project provisions all the virtual machines (VMs) required for the VPSie VC
 - Database Cluster
 - DNS Cluster
 - HAProxy
+![alt text](img/vms.png)
 
 ## Project Structure
 
