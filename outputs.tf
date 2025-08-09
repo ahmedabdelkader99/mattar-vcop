@@ -21,3 +21,11 @@ output "database" {
 output "dns" {
   value = module.dns.databaseIPs
 }
+
+output "haproxy_ip" {
+  value = module.haproxy.srv_ip
+}
+
+output "template_srv_ip" {
+  value = module.templateSrv.srv_ip
+}

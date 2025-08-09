@@ -67,3 +67,8 @@ variable "dnsCores" { type = number }
 ## HAProxy configuration
 variable "haproxyMem" { type = number }
 variable "haproxyCores" { type = number }
+
+
+## TemplateSrv configuration
+variable "tempMem" { type = number }
+variable "tempCores" { type = number }

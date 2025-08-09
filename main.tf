@@ -130,26 +130,26 @@ module "haproxy" {
 
 }
 
-# module "templateSrv" {
-#     source = "./modules/srv"
+module "templateSrv" {
+    source = "./modules/srv"
     
-#     srv_name = "templateSrv"
-#     px_target_node = var.pxTargetNode
-#     clone = var.clone
+    srv_name = "templateSrv"
+    px_target_node = var.pxTargetNode
+    clone = var.clone
 
-#     storage = var.defaultStorage
-#     srv_dsize = var.diskSize
-#     srv_memory = var.haproxyMem
-#     srv_cores = var.haproxyCores
+    storage = var.defaultStorage
+    srv_dsize = var.diskSize
+    srv_memory = var.tempMem
+    srv_cores = var.tempCores
 
-#     srv_subnet = var.subnet
-#     srv_ip = var.proxyIP
-#     srv_cidr = var.cidr
-#     srv_gw = var.gateway
-#     srv_tag = var.tag
+    srv_subnet = var.subnet
+    srv_ip = var.templatesSrvIP
+    srv_cidr = var.cidr
+    srv_gw = var.gateway
+    srv_tag = var.tag
 
-#     ciuser = var.ciuser
-#     sshkeys = var.sshkeys
+    ciuser = var.ciuser
+    sshkeys = var.sshkeys
 
-# }
+}
 
