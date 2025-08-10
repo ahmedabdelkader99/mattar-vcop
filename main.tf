@@ -110,7 +110,7 @@ module "dns" {
 module "haproxy" {
     source = "./modules/srv"
     
-    srv_name = "haproxy"
+    srv_name = "${var.prefix}-haproxy"
     px_target_node = var.pxTargetNode
     clone = var.clone
 
@@ -133,7 +133,7 @@ module "haproxy" {
 module "templateSrv" {
     source = "./modules/srv"
     
-    srv_name = "templateSrv"
+    srv_name = "${var.prefix}-templateSrv"
     px_target_node = var.pxTargetNode
     clone = var.clone
 
