@@ -4,7 +4,10 @@ variable "pxTargetNode" { type = string }
 variable "clone" { type = string }
 
 variable "prefix" { type = string }
-variable "dbCount" { type = number }
+variable "dbCount" {
+  type    = number
+  default = 3
+}
 
 variable "subnet" { type = string }
 variable "storage" { type = string }

@@ -24,16 +24,22 @@ pipeline {
         string(name: 'DB_CORES', defaultValue: '2', description: 'CPU cores for each DB node')
         string(name: 'DB_START_IP', defaultValue: '201', description: 'Starting IP for DB nodes')
 
+        string(name: 'DNS_COUNT', defaultValue: '3', description: 'Number of DNS VMs')
+        string(name: 'DNS_MEM', defaultValue: '4096', description: 'Memory (MB) for each DNS node')
+        string(name: 'DNS_CORES', defaultValue: '2', description: 'CPU cores for each DNS node')
+        string(name: 'DNS_START_IP', defaultValue: '204', description: 'Starting IP for DNS nodes')
+
         string(name: 'K8S_PROXY_IP', defaultValue: '196', description: 'IP for K8s Proxy/load balancer')
         string(name: 'K8S_STORAGE_IP', defaultValue: '199', description: 'IP for K8s Storage/load balancer')
         string(name: 'K8S_START_IP', defaultValue: '190', description: 'Starting IP for Kubernetes nodes')
 
-        string(name: 'DNS_START_IP', defaultValue: '204', description: 'Starting IP for DNS nodes')
         string(name: 'PROXY_IP', defaultValue: '198', description: 'IP for Proxy/load balancer')
         string(name: 'TEMPLATES_SRV_IP', defaultValue: '111', description: 'IP for Templates Server')
         string(name: 'BACKUP_SRV_IP', defaultValue: '112', description: 'IP for Backup Server')
-
+        //template and VM settings
         string(name: 'CLONE_TEMPLATE', defaultValue: 'ci001', description: 'Base VM/template to clone')
+        string(name: 'Temp_Mem', defaultValue: '2048', description: 'Memory (MB) for the template VM')
+        string(name: 'Temp_Cores', defaultValue: '2', description: 'CPU cores for the template VM')
         string(name: 'DEFAULT_STORAGE', defaultValue: 'local', description: 'Proxmox storage location for VM disks')
         string(name: 'AGENT', defaultValue: '1', description: 'Enable QEMU guest agent (1=enabled, 0=disabled)')
         string(name: 'OSTYPE', defaultValue: 'cloud-init', description: 'OS type for the VM')
@@ -89,12 +95,20 @@ pipeline {
                         sed -i 's|^dbMem.*|dbMem          = ${DB_MEM}|' terraform.tfvars
                         sed -i 's|^dbCores.*|dbCores        = ${DB_CORES}|' terraform.tfvars
                         sed -i 's|^dbStartIP.*|dbStartIP      = ${DB_START_IP}|' terraform.tfvars
+
+                        sed -i 's|^dnsCount.*|dnsCount       = ${DNS_COUNT}|' terraform.tfvars
+                        sed -i 's|^dnsMem.*|dnsMem         = ${DNS_MEM}|' terraform.tfvars
+                        sed -i 's|^dnsCores.*|dnsCores       = ${DNS_CORES}|' terraform.tfvars
+                        sed -i 's|^dnsStartIP.*|dnsStartIP     = ${DNS_START_IP}|' terraform.tfvars
+
                         sed -i 's|^k8sProxyIP.*|k8sProxyIP     = ${K8S_PROXY_IP}|' terraform.tfvars
                         sed -i 's|^k8sStorageIP.*|k8sStorageIP   = ${K8S_STORAGE_IP}|' terraform.tfvars
-                        sed -i 's|^dnsStartIP.*|dnsStartIP     = ${DNS_START_IP}|' terraform.tfvars
                         sed -i 's|^proxyIP.*|proxyIP        = ${PROXY_IP}|' terraform.tfvars
                         sed -i 's|^templatesSrvIP.*|templatesSrvIP  = ${TEMPLATES_SRV_IP}|' terraform.tfvars
                         sed -i 's|^backupSrvIP.*|backupSrvIP     = ${BACKUP_SRV_IP}|' terraform.tfvars
+
+                        sed -i 's|^tempMem.*|tempMem        = ${Temp_Mem}|' terraform.tfvars
+                        sed -i 's|^tempCores.*|tempCores      = ${Temp_Cores}|' terraform.tfvars
 
                         sed -i 's|^clone.*|clone          = "${CLONE_TEMPLATE}"|' terraform.tfvars
                         sed -i 's|^defaultStorage.*|defaultStorage = "${DEFAULT_STORAGE}"|' terraform.tfvars
@@ -126,5 +140,48 @@ pipeline {
         stage('Terraform Apply') {
             steps { sh 'terraform apply -auto-approve' }
         }
-    }
+        
+        stage('Check VM Availability') {
+            steps {
+                script {
+                    def vmIPs = []
+
+                    // DB VMs
+                    for (int i = 0; i < params.DB_COUNT.toInteger(); i++) {
+                        vmIPs.add("${params.SUBNET}.${params.DB_START_IP.toInteger() + i}")
+                    }
+
+                    // K8s master nodes
+                    for (int i = 0; i < params.MASTER_COUNT.toInteger(); i++) {
+                        vmIPs.add("${params.SUBNET}.${params.K8S_START_IP.toInteger() + i}")
+                    }
+
+                    // K8s worker nodes
+                    for (int i = 0; i < params.WORKER_COUNT.toInteger(); i++) {
+                        vmIPs.add("${params.SUBNET}.${params.K8S_START_IP.toInteger() + params.MASTER_COUNT.toInteger() + i}")
+                    }
+
+                    // DNS nodes (assuming 3)
+                    for (int i = 0; i < 3; i++) {
+                        vmIPs.add("${params.SUBNET}.${params.DNS_START_IP.toInteger() + i}")
+                    }
+
+                    // Proxy, Templates, Backup
+                    vmIPs.add("${params.SUBNET}.${params.PROXY_IP.toInteger()}")
+                    vmIPs.add("${params.SUBNET}.${params.TEMPLATES_SRV_IP.toInteger()}")
+                    vmIPs.add("${params.SUBNET}.${params.BACKUP_SRV_IP.toInteger()}")
+
+                    // Ping check
+                    vmIPs.each { ip ->
+                        def pingResult = sh(script: "ping -c 2 ${ip}", returnStatus: true)
+                        if (pingResult != 0) {
+                            error "❌ VM with IP ${ip} is not reachable!"
+                        } else {
+                            echo "✅ VM ${ip} is reachable."
+                        }
+                    }
+                }
+            }
+        }
+    }  
 }
