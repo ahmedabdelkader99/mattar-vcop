@@ -9,6 +9,12 @@ variable "dbCount" {
   default = 3
 }
 
+
+variable "dnsCount" {
+  type    = number
+  default = 3
+}
+
 variable "subnet" { type = string }
 variable "storage" { type = string }
 variable "diskSize" { type = number }

@@ -103,8 +103,8 @@ module "dns" {
 
     ciuser = var.ciuser
     sshkeys = var.sshkeys
-
-    dbCount = var.dnsCount
+    
+    dnsCount = var.dnsCount
 }
 
 module "haproxy" {
