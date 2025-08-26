@@ -18,6 +18,7 @@ pipeline {
         string(name: 'WORKER_COUNT', defaultValue: '3', description: 'Number of Kubernetes worker nodes')
         string(name: 'WORKER_MEM', defaultValue: '4096', description: 'Memory (MB) for each worker node')
         string(name: 'WORKER_CORES', defaultValue: '2', description: 'CPU cores for each worker node')
+        string(name: 'K8S_START_IP', defaultValue: '190', description: 'Starting IP for Kubernetes nodes')
 
         string(name: 'DB_COUNT', defaultValue: '3', description: 'Number of DB VMs')
         string(name: 'DB_MEM', defaultValue: '4096', description: 'Memory (MB) for each DB node')
@@ -29,15 +30,21 @@ pipeline {
         string(name: 'DNS_CORES', defaultValue: '2', description: 'CPU cores for each DNS node')
         string(name: 'DNS_START_IP', defaultValue: '204', description: 'Starting IP for DNS nodes')
 
-        string(name: 'K8S_PROXY_IP', defaultValue: '196', description: 'IP for K8s Proxy/load balancer')
-        string(name: 'K8S_STORAGE_IP', defaultValue: '199', description: 'IP for K8s Storage/load balancer')
-        string(name: 'K8S_START_IP', defaultValue: '190', description: 'Starting IP for Kubernetes nodes')
+        string(name: 'k8sproxy_Mem', defaultValue: '2048', description: 'Memory for K8s Proxy/load balancer')
+        string(name: 'k8sproxy_Cores', defaultValue: '2', description: 'CPU cores for K8s Proxy/load balancer')
+        string(name: 'K8S_PROXY_IP', defaultValue: '169', description: 'IP for K8s Proxy/load balancer')  
 
-        string(name: 'PROXY_IP', defaultValue: '198', description: 'IP for Proxy/load balancer')
+        string(name: 'Haproxy_Mem', defaultValue: '2048', description: 'Memory for HAProxy ')
+        string(name: 'Haproxy_Cores', defaultValue: '2', description: 'CPU cores for HAProxy ')
+        string(name: 'PROXY_IP', defaultValue: '198', description: 'IP for HAProxy ')
+
+        string(name: 'k8storageMem', defaultValue: '2048', description: 'Memory for K8s Storage')
+        string(name: 'k8storageCores', defaultValue: '2', description: 'CPU cores for K8s Storage')
+        string(name: 'K8S_STORAGE_IP', defaultValue: '199', description: 'IP for K8s Storage/load balancer')
+
         string(name: 'TEMPLATES_SRV_IP', defaultValue: '111', description: 'IP for Templates Server')
         string(name: 'BACKUP_SRV_IP', defaultValue: '112', description: 'IP for Backup Server')
 
-        // Template and VM settings
         string(name: 'CLONE_TEMPLATE', defaultValue: 'ci001', description: 'Base VM/template to clone')
         string(name: 'Temp_Mem', defaultValue: '2048', description: 'Memory (MB) for the template VM')
         string(name: 'Temp_Cores', defaultValue: '2', description: 'CPU cores for the template VM')
@@ -52,7 +59,6 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/ahmedabdelkader99/mattar-vcop'
@@ -61,81 +67,105 @@ pipeline {
 
         stage('Check Proxmox Login') {
             steps {
-                sh """
-                    echo "🔑 Checking Proxmox login for user: \$TF_VAR_px_user"
-                    LOGIN_RESPONSE=\$(curl -sk -d "username=\$TF_VAR_px_user&password=\$TF_VAR_px_password" "\$PX_ENDPOINT" || true)
+                sh '''
+                    echo "🔑 Checking Proxmox login for user: $TF_VAR_px_user"
+                    LOGIN_RESPONSE=$(curl -sk \
+                      -d "username=$TF_VAR_px_user&password=$TF_VAR_px_password" \
+                      "$PX_ENDPOINT" || true)
 
-                    if echo "$LOGIN_RESPONSE" | grep -q '"ticket"'; then
-                        echo "✅ Login succeeded"
+                    if echo "$LOGIN_RESPONSE"; then
+                      echo "✅ Login succeeded to Proxmox API $PX_ENDPOINT"
                     else
-                        echo "❌ Login failed"
-                        exit 1
+                      echo "❌ Login FAILED to Proxmox API"
+                      echo "Response: $LOGIN_RESPONSE"
+                      exit 1
                     fi
-
-                """
+                '''
             }
         }
 
-        stage('Update tfvars') {
+        stage('Generate tfvars') {
             steps {
                 script {
-                    sh """
-                        sed -i 's|^px_endpoint.*|px_endpoint     = "${PX_ENDPOINT}"|' terraform.tfvars
-                        sed -i 's|^pxTargetNode.*|pxTargetNode   = "${PX_NODE}"|' terraform.tfvars
-                        sed -i 's|^px_tls.*|px_tls               = ${PX_TLS}|' terraform.tfvars
+                    def tfvarsContent = """
+px_endpoint   = "${params.PX_ENDPOINT}"
+pxTargetNode  = "${params.PX_NODE}"
+px_tls        = ${params.PX_TLS}
 
-                        sed -i 's|^masterCount.*|masterCount    = ${MASTER_COUNT}|' terraform.tfvars
-                        sed -i 's|^workersCount.*|workersCount   = ${WORKER_COUNT}|' terraform.tfvars
-                        sed -i 's|^masterMem.*|masterMem      = ${MASTER_MEM}|' terraform.tfvars
-                        sed -i 's|^masterCores.*|masterCores    = ${MASTER_CORES}|' terraform.tfvars
-                        sed -i 's|^workerMem.*|workerMem      = ${WORKER_MEM}|' terraform.tfvars
-                        sed -i 's|^workerCores.*|workerCores    = ${WORKER_CORES}|' terraform.tfvars
+clone          = "${params.CLONE_TEMPLATE}"
+defaultStorage = "${params.DEFAULT_STORAGE}"
+agent          = ${params.AGENT}
+osType         = "${params.OSTYPE}"
+scsihw         = "${params.SCSI_HW}"
+prefix         = "${params.PREFIX}"
+diskSize       = ${params.DISK_SIZE}
 
-                        sed -i 's|^dbCount.*|dbCount        = ${DB_COUNT}|' terraform.tfvars
-                        sed -i 's|^dbMem.*|dbMem          = ${DB_MEM}|' terraform.tfvars
-                        sed -i 's|^dbCores.*|dbCores        = ${DB_CORES}|' terraform.tfvars
-                        sed -i 's|^dbStartIP.*|dbStartIP      = ${DB_START_IP}|' terraform.tfvars
+subnet         = "${params.SUBNET}"
+gateway        = "${params.GATEWAY}"
+cidr           = 24
+tag            = 1
+k8sStartIP     = ${params.K8S_START_IP}
+dbStartIP      = ${params.DB_START_IP}
+dnsStartIP     = ${params.DNS_START_IP}
+templatesSrvIP = ${params.TEMPLATES_SRV_IP}
+backupSrvIP    = ${params.BACKUP_SRV_IP}
+sshkeys        = ""
+ciuser         = "vpsie"
 
-                        sed -i 's|^dnsCount.*|dnsCount       = ${DNS_COUNT}|' terraform.tfvars
-                        sed -i 's|^dnsMem.*|dnsMem         = ${DNS_MEM}|' terraform.tfvars
-                        sed -i 's|^dnsCores.*|dnsCores       = ${DNS_CORES}|' terraform.tfvars
-                        sed -i 's|^dnsStartIP.*|dnsStartIP     = ${DNS_START_IP}|' terraform.tfvars
+masterCount    = ${params.MASTER_COUNT}
+masterMem      = ${params.MASTER_MEM}
+masterCores    = ${params.MASTER_CORES}
 
-                        sed -i 's|^k8sProxyIP.*|k8sProxyIP     = ${K8S_PROXY_IP}|' terraform.tfvars
-                        sed -i 's|^k8sStorageIP.*|k8sStorageIP   = ${K8S_STORAGE_IP}|' terraform.tfvars
-                        sed -i 's|^proxyIP.*|proxyIP        = ${PROXY_IP}|' terraform.tfvars
-                        sed -i 's|^templatesSrvIP.*|templatesSrvIP  = ${TEMPLATES_SRV_IP}|' terraform.tfvars
-                        sed -i 's|^backupSrvIP.*|backupSrvIP     = ${BACKUP_SRV_IP}|' terraform.tfvars
+workersCount   = ${params.WORKER_COUNT}
+workerMem      = ${params.WORKER_MEM}
+workerCores    = ${params.WORKER_CORES}
 
-                        sed -i 's|^tempMem.*|tempMem        = ${Temp_Mem}|' terraform.tfvars
-                        sed -i 's|^tempCores.*|tempCores      = ${Temp_Cores}|' terraform.tfvars
+dbCount        = ${params.DB_COUNT}
+dbMem          = ${params.DB_MEM}
+dbCores        = ${params.DB_CORES}
 
-                        sed -i 's|^clone.*|clone          = "${CLONE_TEMPLATE}"|' terraform.tfvars
-                        sed -i 's|^defaultStorage.*|defaultStorage = "${DEFAULT_STORAGE}"|' terraform.tfvars
-                        sed -i 's|^agent.*|agent          = ${AGENT}|' terraform.tfvars
-                        sed -i 's|^osType.*|osType         = "${OSTYPE}"|' terraform.tfvars
-                        sed -i 's|^scsihw.*|scsihw        = "${SCSI_HW}"|' terraform.tfvars
-                        sed -i 's|^prefix.*|prefix         = "${PREFIX}"|' terraform.tfvars
-                        sed -i 's|^diskSize.*|diskSize       = ${DISK_SIZE}|' terraform.tfvars
+dnsCount       = ${params.DNS_COUNT}
+dnsMem         = ${params.DNS_MEM}
+dnsCores       = ${params.DNS_CORES}
 
-                        sed -i 's|^subnet.*|subnet         = "${SUBNET}"|' terraform.tfvars
-                        sed -i 's|^gateway.*|gateway        = "${GATEWAY}"|' terraform.tfvars
-                        sed -i 's|^k8sStartIP.*|k8sStartIP     = ${K8S_START_IP}|' terraform.tfvars
-                        echo "################################################################"
-                        echo "Updated terraform.tfvars:"
-                        echo "################################################################"
-                        cat terraform.tfvars
-                        echo "################################################################"
+k8sproxyMem   = ${params.k8sproxy_Mem}
+k8sproxyCores = ${params.k8sproxy_Cores}
+k8sProxyIP     = ${params.K8S_PROXY_IP}
 
-                    """
+k8storageMem  = ${params.k8storage_Mem}
+k8storageCores= ${params.k8storage_Cores}
+k8sStorageIP   = ${params.K8S_STORAGE_IP}
+
+haproxyMem    = ${params.Haproxy_Mem}
+haproxyCores  = ${params.Haproxy_Cores}
+proxyIP       = ${params.PROXY_IP}
+
+tempMem        = ${params.Temp_Mem}
+tempCores      = ${params.Temp_Cores}
+"""
+                    writeFile file: 'terraform.tfvars', text: tfvarsContent
+                    sh "echo '✅ Generated terraform.tfvars:' && cat terraform.tfvars"
                 }
             }
         }
 
-        stage('Terraform Init') { steps { sh 'terraform init' } }
-        stage('Terraform Plan') { steps { sh 'terraform plan' } }
-        stage('Terraform Validate') { steps { sh 'terraform validate'} }
-        stage('Terraform Apply') { steps { sh 'terraform apply -var-file="terraform.tfvars" -auto-approve' } }
+        stage('Terraform Init') {
+            steps {
+                sh 'terraform init'
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                sh 'terraform plan'
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                sh 'terraform apply -auto-approve'
+            }
+        }
 
         stage('Check VM Availability') {
             steps {
@@ -143,29 +173,29 @@ pipeline {
                     def vmIPs = []
 
                     // DB VMs
-                    for (int i = 0; i < DB_COUNT.toInteger(); i++) {
-                        vmIPs.add("${SUBNET}.${DB_START_IP.toInteger() + i}")
+                    for (int i = 0; i < params.DB_COUNT.toInteger(); i++) {
+                        vmIPs.add("${params.SUBNET}.${params.DB_START_IP.toInteger() + i}")
                     }
 
                     // K8s master nodes
-                    for (int i = 0; i < MASTER_COUNT.toInteger(); i++) {
-                        vmIPs.add("${SUBNET}.${K8S_START_IP.toInteger() + i}")
+                    for (int i = 0; i < params.MASTER_COUNT.toInteger(); i++) {
+                        vmIPs.add("${params.SUBNET}.${params.K8S_START_IP.toInteger() + i}")
                     }
 
                     // K8s worker nodes
-                    for (int i = 0; i < WORKER_COUNT.toInteger(); i++) {
-                        vmIPs.add("${SUBNET}.${K8S_START_IP.toInteger() + MASTER_COUNT.toInteger() + i}")
+                    for (int i = 0; i < params.WORKER_COUNT.toInteger(); i++) {
+                        vmIPs.add("${params.SUBNET}.${params.K8S_START_IP.toInteger() + params.MASTER_COUNT.toInteger() + i}")
                     }
 
                     // DNS nodes
-                    for (int i = 0; i < DNS_COUNT.toInteger(); i++) {
-                        vmIPs.add("${SUBNET}.${DNS_START_IP.toInteger() + i}")
+                    for (int i = 0; i < params.DNS_COUNT.toInteger(); i++) {
+                        vmIPs.add("${params.SUBNET}.${params.DNS_START_IP.toInteger() + i}")
                     }
 
                     // Proxy, Templates, Backup
-                    vmIPs.add("${SUBNET}.${PROXY_IP.toInteger()}")
-                    vmIPs.add("${SUBNET}.${TEMPLATES_SRV_IP.toInteger()}")
-                    vmIPs.add("${SUBNET}.${BACKUP_SRV_IP.toInteger()}")
+                    vmIPs.add("${params.SUBNET}.${params.PROXY_IP.toInteger()}")
+                    vmIPs.add("${params.SUBNET}.${params.TEMPLATES_SRV_IP.toInteger()}")
+                    vmIPs.add("${params.SUBNET}.${params.BACKUP_SRV_IP.toInteger()}")
 
                     // Ping check
                     vmIPs.each { ip ->
