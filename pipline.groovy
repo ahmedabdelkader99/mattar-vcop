@@ -36,7 +36,8 @@ pipeline {
         string(name: 'PROXY_IP', defaultValue: '198', description: 'IP for Proxy/load balancer')
         string(name: 'TEMPLATES_SRV_IP', defaultValue: '111', description: 'IP for Templates Server')
         string(name: 'BACKUP_SRV_IP', defaultValue: '112', description: 'IP for Backup Server')
-        //template and VM settings
+
+        // Template and VM settings
         string(name: 'CLONE_TEMPLATE', defaultValue: 'ci001', description: 'Base VM/template to clone')
         string(name: 'Temp_Mem', defaultValue: '2048', description: 'Memory (MB) for the template VM')
         string(name: 'Temp_Cores', defaultValue: '2', description: 'CPU cores for the template VM')
@@ -51,6 +52,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/ahmedabdelkader99/mattar-vcop'
@@ -63,13 +65,13 @@ pipeline {
                     echo "🔑 Checking Proxmox login for user: \$TF_VAR_px_user"
                     LOGIN_RESPONSE=\$(curl -sk -d "username=\$TF_VAR_px_user&password=\$TF_VAR_px_password" "\$PX_ENDPOINT" || true)
 
-                    if echo "\$LOGIN_RESPONSE"; then
-                        echo "✅ Login succeeded to Proxmox API \$PX_ENDPOINT"
+                    if echo "$LOGIN_RESPONSE" | grep -q '"ticket"'; then
+                        echo "✅ Login succeeded"
                     else
-                        echo "❌ Login FAILED to Proxmox API"
-                        echo "Response: \$LOGIN_RESPONSE"
+                        echo "❌ Login failed"
                         exit 1
                     fi
+
                 """
             }
         }
@@ -78,11 +80,9 @@ pipeline {
             steps {
                 script {
                     sh """
-                        sed -i 's|^px_endpoint.*|px_endpoint    = "${PX_ENDPOINT}"|' terraform.tfvars
-                        sed -i 's|^px_user.*|px_user        = "${TF_VAR_px_user}"|' terraform.tfvars
-                        sed -i 's|^px_password.*|px_password    = "${TF_VAR_px_password}"|' terraform.tfvars
+                        sed -i 's|^px_endpoint.*|px_endpoint     = "${PX_ENDPOINT}"|' terraform.tfvars
                         sed -i 's|^pxTargetNode.*|pxTargetNode   = "${PX_NODE}"|' terraform.tfvars
-                        sed -i 's|^px_tls.*|px_tls         = ${PX_TLS}|' terraform.tfvars
+                        sed -i 's|^px_tls.*|px_tls               = ${PX_TLS}|' terraform.tfvars
 
                         sed -i 's|^masterCount.*|masterCount    = ${MASTER_COUNT}|' terraform.tfvars
                         sed -i 's|^workersCount.*|workersCount   = ${WORKER_COUNT}|' terraform.tfvars
@@ -121,55 +121,51 @@ pipeline {
                         sed -i 's|^subnet.*|subnet         = "${SUBNET}"|' terraform.tfvars
                         sed -i 's|^gateway.*|gateway        = "${GATEWAY}"|' terraform.tfvars
                         sed -i 's|^k8sStartIP.*|k8sStartIP     = ${K8S_START_IP}|' terraform.tfvars
-
+                        echo "################################################################"
                         echo "Updated terraform.tfvars:"
+                        echo "################################################################"
                         cat terraform.tfvars
+                        echo "################################################################"
+
                     """
                 }
             }
         }
 
-        stage('Terraform Init') {
-            steps { sh 'terraform init' }
-        }
+        stage('Terraform Init') { steps { sh 'terraform init' } }
+        stage('Terraform Plan') { steps { sh 'terraform plan' } }
+        stage('Terraform Validate') { steps { sh 'terraform validate'} }
+        stage('Terraform Apply') { steps { sh 'terraform apply -var-file="terraform.tfvars" -auto-approve' } }
 
-        stage('Terraform Plan') {
-            steps { sh 'terraform plan' }
-        }
-
-        stage('Terraform Apply') {
-            steps { sh 'terraform apply -auto-approve' }
-        }
-        
         stage('Check VM Availability') {
             steps {
                 script {
                     def vmIPs = []
 
                     // DB VMs
-                    for (int i = 0; i < params.DB_COUNT.toInteger(); i++) {
-                        vmIPs.add("${params.SUBNET}.${params.DB_START_IP.toInteger() + i}")
+                    for (int i = 0; i < DB_COUNT.toInteger(); i++) {
+                        vmIPs.add("${SUBNET}.${DB_START_IP.toInteger() + i}")
                     }
 
                     // K8s master nodes
-                    for (int i = 0; i < params.MASTER_COUNT.toInteger(); i++) {
-                        vmIPs.add("${params.SUBNET}.${params.K8S_START_IP.toInteger() + i}")
+                    for (int i = 0; i < MASTER_COUNT.toInteger(); i++) {
+                        vmIPs.add("${SUBNET}.${K8S_START_IP.toInteger() + i}")
                     }
 
                     // K8s worker nodes
-                    for (int i = 0; i < params.WORKER_COUNT.toInteger(); i++) {
-                        vmIPs.add("${params.SUBNET}.${params.K8S_START_IP.toInteger() + params.MASTER_COUNT.toInteger() + i}")
+                    for (int i = 0; i < WORKER_COUNT.toInteger(); i++) {
+                        vmIPs.add("${SUBNET}.${K8S_START_IP.toInteger() + MASTER_COUNT.toInteger() + i}")
                     }
 
-                    // DNS nodes (assuming 3)
-                    for (int i = 0; i < 3; i++) {
-                        vmIPs.add("${params.SUBNET}.${params.DNS_START_IP.toInteger() + i}")
+                    // DNS nodes
+                    for (int i = 0; i < DNS_COUNT.toInteger(); i++) {
+                        vmIPs.add("${SUBNET}.${DNS_START_IP.toInteger() + i}")
                     }
 
                     // Proxy, Templates, Backup
-                    vmIPs.add("${params.SUBNET}.${params.PROXY_IP.toInteger()}")
-                    vmIPs.add("${params.SUBNET}.${params.TEMPLATES_SRV_IP.toInteger()}")
-                    vmIPs.add("${params.SUBNET}.${params.BACKUP_SRV_IP.toInteger()}")
+                    vmIPs.add("${SUBNET}.${PROXY_IP.toInteger()}")
+                    vmIPs.add("${SUBNET}.${TEMPLATES_SRV_IP.toInteger()}")
+                    vmIPs.add("${SUBNET}.${BACKUP_SRV_IP.toInteger()}")
 
                     // Ping check
                     vmIPs.each { ip ->
@@ -183,5 +179,5 @@ pipeline {
                 }
             }
         }
-    }  
+    }
 }
