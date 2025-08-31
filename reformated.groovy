@@ -58,13 +58,11 @@ pipeline {
         string(name: 'GATEWAY', defaultValue: '11.1.1.1', description: 'Gateway IP for the subnet')
         // Password for all VMs
         string(name: 'VM_VCOP_PASSWORD', defaultValue: 'Your-Vcop-Password', description: 'Password for all VMs')
-        //DB repo nodes details
+        // DB repo nodes details
         string(name: 'DB_HOST1_NAME', defaultValue: 'k8s-database01', description: 'DB node 1 hostname')
         string(name: 'DB_HOST1_IP', defaultValue: '10.x.x.x', description: 'DB node 1 IP address')
-
         string(name: 'DB_HOST2_NAME', defaultValue: 'k8s-database02', description: 'DB node 2 hostname')
         string(name: 'DB_HOST2_IP', defaultValue: '10.x.x.x', description: 'DB node 2 IP address')
-
         string(name: 'DB_HOST3_NAME', defaultValue: 'k8s-database03', description: 'DB node 3 hostname')
         string(name: 'DB_HOST3_IP', defaultValue: '10.x.x.x', description: 'DB node 3 IP address')
     }
@@ -81,15 +79,15 @@ pipeline {
                 sh '''
                     echo "🔑 Checking Proxmox login for user: $TF_VAR_px_user"
                     LOGIN_RESPONSE=$(curl -sk \
-                      -d "username=$TF_VAR_px_user&password=$TF_VAR_px_password" \
-                      "$PX_ENDPOINT" || true)
+                        -d "username=$TF_VAR_px_user&password=$TF_VAR_px_password" \
+                        "$PX_ENDPOINT" || true)
 
                     if echo "$LOGIN_RESPONSE"; then
-                      echo "✅ Login succeeded to Proxmox API $PX_ENDPOINT"
+                        echo "✅ Login succeeded to Proxmox API $PX_ENDPOINT"
                     else
-                      echo "❌ Login FAILED to Proxmox API"
-                      echo "Response: $LOGIN_RESPONSE"
-                      exit 1
+                        echo "❌ Login FAILED to Proxmox API"
+                        echo "Response: $LOGIN_RESPONSE"
+                        exit 1
                     fi
                 '''
             }
@@ -99,60 +97,60 @@ pipeline {
             steps {
                 script {
                     def tfvarsContent = """
-px_endpoint   = "${params.PX_ENDPOINT}"
-pxTargetNode  = "${params.PX_NODE}"
-px_tls        = ${params.PX_TLS}
+px_endpoint      = "${params.PX_ENDPOINT}"
+pxTargetNode     = "${params.PX_NODE}"
+px_tls           = ${params.PX_TLS}
 
-clone          = "${params.CLONE_TEMPLATE}"
-defaultStorage = "${params.DEFAULT_STORAGE}"
-agent          = ${params.AGENT}
-osType         = "${params.OSTYPE}"
-scsihw         = "${params.SCSI_HW}"
-prefix         = "${params.PREFIX}"
-diskSize       = ${params.DISK_SIZE}
+clone            = "${params.CLONE_TEMPLATE}"
+defaultStorage   = "${params.DEFAULT_STORAGE}"
+agent            = ${params.AGENT}
+osType           = "${params.OSTYPE}"
+scsihw           = "${params.SCSI_HW}"
+prefix           = "${params.PREFIX}"
+diskSize         = ${params.DISK_SIZE}
 
-subnet         = "${params.SUBNET}"
-gateway        = "${params.GATEWAY}"
-cidr           = 24
-tag            = 1
-k8sStartIP     = ${params.K8S_START_IP}
-dbStartIP      = ${params.DB_START_IP}
-dnsStartIP     = ${params.DNS_START_IP}
-templatesSrvIP = ${params.TEMPLATES_SRV_IP}
-backupSrvIP    = ${params.BACKUP_SRV_IP}
-sshkeys        = ""
-ciuser         = "vpsie"
+subnet           = "${params.SUBNET}"
+gateway          = "${params.GATEWAY}"
+cidr             = 24
+tag              = 1
+k8sStartIP       = ${params.K8S_START_IP}
+dbStartIP        = ${params.DB_START_IP}
+dnsStartIP       = ${params.DNS_START_IP}
+templatesSrvIP   = ${params.TEMPLATES_SRV_IP}
+backupSrvIP      = ${params.BACKUP_SRV_IP}
+sshkeys          = ""
+ciuser           = "vpsie"
 
-masterCount    = ${params.MASTER_COUNT}
-masterMem      = ${params.MASTER_MEM}
-masterCores    = ${params.MASTER_CORES}
+masterCount      = ${params.MASTER_COUNT}
+masterMem        = ${params.MASTER_MEM}
+masterCores      = ${params.MASTER_CORES}
 
-workersCount   = ${params.WORKER_COUNT}
-workerMem      = ${params.WORKER_MEM}
-workerCores    = ${params.WORKER_CORES}
+workersCount     = ${params.WORKER_COUNT}
+workerMem        = ${params.WORKER_MEM}
+workerCores      = ${params.WORKER_CORES}
 
-dbCount        = ${params.DB_COUNT}
-dbMem          = ${params.DB_MEM}
-dbCores        = ${params.DB_CORES}
+dbCount          = ${params.DB_COUNT}
+dbMem            = ${params.DB_MEM}
+dbCores          = ${params.DB_CORES}
 
-dnsCount       = ${params.DNS_COUNT}
-dnsMem         = ${params.DNS_MEM}
-dnsCores       = ${params.DNS_CORES}
+dnsCount         = ${params.DNS_COUNT}
+dnsMem           = ${params.DNS_MEM}
+dnsCores         = ${params.DNS_CORES}
 
-k8sproxyMem   = ${params.k8sproxy_Mem}
-k8sproxyCores = ${params.k8sproxy_Cores}
-k8sProxyIP     = ${params.K8S_PROXY_IP}
+k8sproxyMem      = ${params.k8sproxy_Mem}
+k8sproxyCores    = ${params.k8sproxy_Cores}
+k8sProxyIP       = ${params.K8S_PROXY_IP}
 
-k8storageMem  = ${params.k8storage_Mem}
-k8storageCores= ${params.k8storage_Cores}
-k8sStorageIP   = ${params.K8S_STORAGE_IP}
+k8storageMem     = ${params.k8storage_Mem}
+k8storageCores   = ${params.k8storage_Cores}
+k8sStorageIP     = ${params.K8S_STORAGE_IP}
 
-haproxyMem    = ${params.Haproxy_Mem}
-haproxyCores  = ${params.Haproxy_Cores}
-proxyIP       = ${params.PROXY_IP}
+haproxyMem       = ${params.Haproxy_Mem}
+haproxyCores     = ${params.Haproxy_Cores}
+proxyIP          = ${params.PROXY_IP}
 
-tempMem        = ${params.Temp_Mem}
-tempCores      = ${params.Temp_Cores}
+tempMem          = ${params.Temp_Mem}
+tempCores        = ${params.Temp_Cores}
 """
                     writeFile file: 'terraform.tfvars', text: tfvarsContent
                     sh "echo '✅ Generated terraform.tfvars:' && cat terraform.tfvars"
@@ -183,23 +181,23 @@ tempCores      = ${params.Temp_Cores}
                 script {
                     // Install sshpass if missing
                     sh '''
-                    if ! command -v sshpass &> /dev/null; then
-                        echo "ℹ️ sshpass not found, installing..."
-                        sudo apt-get update && sudo apt-get install -y sshpass
-                    else
-                        echo "ℹ️ sshpass already installed."
-                    fi
-                    ''' // End sshpass install check
+                        if ! command -v sshpass &> /dev/null; then
+                            echo "ℹ️ sshpass not found, installing..."
+                            sudo apt-get update && sudo apt-get install -y sshpass
+                        else
+                            echo "ℹ️ sshpass already installed."
+                        fi
+                    '''
 
                     // Generate SSH key if not exists
                     sh '''
-                    if [ ! -f ~/.ssh/id_rsa ]; then
-                        ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N ''
-                        echo "✅ SSH key generated."
-                    else
-                        echo "ℹ️ SSH key already exists."
-                    fi
-                    ''' // End SSH key generation
+                        if [ ! -f ~/.ssh/id_rsa ]; then
+                            ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N ''
+                            echo "✅ SSH key generated."
+                        else
+                            echo "ℹ️ SSH key already exists."
+                        fi
+                    '''
 
                     def vmIPs = []
 
@@ -245,7 +243,7 @@ tempCores      = ${params.Temp_Cores}
                                 echo "⚠️ Attempt ${attempt} - VM ${ip} is not reachable yet ..."
                                 sleep 5
                             }
-                        } // End retry loop
+                        }
 
                         if (!reachable) {
                             echo "❌ VM ${ip} is not reachable after ${retries} attempts."
@@ -253,19 +251,19 @@ tempCores      = ${params.Temp_Cores}
                         } else {
                             // Copy SSH key to reachable VM
                             sh """
-                            sshpass -p '${params.VM_VCOP_PASSWORD}' ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no root@${ip}
-                            echo "✅ SSH key copied to ${ip}."
+                                sshpass -p '${params.VM_VCOP_PASSWORD}' ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no root@${ip}
+                                echo "✅ SSH key copied to ${ip}."
                             """
                         }
-                    } // End VM loop
+                    }
 
                     // Fail pipeline if any VMs are unreachable
                     if (unreachableVMs.size() > 0) {
                         error "The following VMs are unreachable: ${unreachableVMs.join(', ')}"
                     }
-                } // End script
-            } // End steps
-        } // End stage
+                }
+            }
+        }
 
         stage('db-cluster Repo') {
             steps {
@@ -291,8 +289,8 @@ ${params.DB_HOST3_NAME} ansible_host=${params.DB_HOST3_IP} ansible_port=22
 
                         echo '⚙️ Running DB Ansible playbook...'
                         sh '''
-                    ansible-playbook -i hosts play-xtraDB.yml
-                '''
+                            ansible-playbook -i hosts play-xtraDB.yml
+                        '''
                     }
                 }
             }

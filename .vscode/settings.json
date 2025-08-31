@@ -1,0 +1,5 @@
+{
+    "editor.formatOnSave": true,
+    "groovyLinter.codenarc.enable": true,
+    "groovyLinter.format.enable": true
+}
