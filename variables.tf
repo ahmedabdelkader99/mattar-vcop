@@ -30,7 +30,7 @@ variable "dbStartIP" { type = number }
 variable "dnsStartIP" { type = number }
 variable "proxyIP" { type = number }
 variable "templatesSrvIP" { type = number }
-variable "backupSrvIP" { type = number }
+#variable "backupSrvIP" { type = number }
 
 
 ## Kubernetes cluster configuration
