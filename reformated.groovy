@@ -43,7 +43,6 @@ pipeline {
         string(name: 'K8S_STORAGE_IP', defaultValue: '199', description: 'IP for K8s Storage/load balancer')
 
         string(name: 'TEMPLATES_SRV_IP', defaultValue: '111', description: 'IP for Templates Server')
-        string(name: 'BACKUP_SRV_IP', defaultValue: '112', description: 'IP for Backup Server')
 
         string(name: 'CLONE_TEMPLATE', defaultValue: 'ci001', description: 'Base VM/template to clone')
         string(name: 'Temp_Mem', defaultValue: '2048', description: 'Memory (MB) for the template VM')
@@ -117,7 +116,6 @@ k8sStartIP       = ${params.K8S_START_IP}
 dbStartIP        = ${params.DB_START_IP}
 dnsStartIP       = ${params.DNS_START_IP}
 templatesSrvIP   = ${params.TEMPLATES_SRV_IP}
-backupSrvIP      = ${params.BACKUP_SRV_IP}
 sshkeys          = ""
 ciuser           = "vpsie"
 
@@ -191,6 +189,7 @@ tempCores        = ${params.Temp_Cores}
 
                     // Generate SSH key if not exists
                     sh '''
+
                         if [ ! -f ~/.ssh/id_rsa ]; then
                             ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N ''
                             echo "✅ SSH key generated."
@@ -224,7 +223,6 @@ tempCores        = ${params.Temp_Cores}
                     // Proxy, Templates, Backup
                     vmIPs.add("${params.SUBNET}.${params.PROXY_IP.toInteger()}")
                     vmIPs.add("${params.SUBNET}.${params.TEMPLATES_SRV_IP.toInteger()}")
-                    vmIPs.add("${params.SUBNET}.${params.BACKUP_SRV_IP.toInteger()}")
 
                     def unreachableVMs = []
 
@@ -234,14 +232,14 @@ tempCores        = ${params.Temp_Cores}
                         boolean reachable = false
 
                         for (int attempt = 1; attempt <= retries; attempt++) {
-                            def pingResult = sh(script: "ping -c 2 ${ip}", returnStatus: true)
+                            def pingResult = sh(script: "ping -c 5 ${ip}", returnStatus: true)
                             if (pingResult == 0) {
                                 reachable = true
                                 echo "✅ VM ${ip} is reachable."
                                 break
                             } else {
                                 echo "⚠️ Attempt ${attempt} - VM ${ip} is not reachable yet ..."
-                                sleep 5
+                                sleep 60
                             }
                         }
 
