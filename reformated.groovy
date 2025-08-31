@@ -32,7 +32,7 @@ pipeline {
 
         string(name: 'k8sproxy_Mem', defaultValue: '2048', description: 'Memory for K8s Proxy/load balancer')
         string(name: 'k8sproxy_Cores', defaultValue: '2', description: 'CPU cores for K8s Proxy/load balancer')
-        string(name: 'K8S_PROXY_IP', defaultValue: '169', description: 'IP for K8s Proxy/load balancer')
+        string(name: 'K8S_PROXY_IP', defaultValue: '196', description: 'IP for K8s Proxy/load balancer')
 
         string(name: 'Haproxy_Mem', defaultValue: '2048', description: 'Memory for HAProxy ')
         string(name: 'Haproxy_Cores', defaultValue: '2', description: 'CPU cores for HAProxy ')
@@ -54,8 +54,8 @@ pipeline {
         string(name: 'SCSI_HW', defaultValue: 'virtio-scsi-pci', description: 'SCSI controller type')
         string(name: 'PREFIX', defaultValue: 'test-', description: 'Prefix for VM names')
         string(name: 'DISK_SIZE', defaultValue: '40', description: 'Disk size (GB) per VM')
-        string(name: 'SUBNET', defaultValue: '11.1.1', description: 'Subnet for VMs')
-        string(name: 'GATEWAY', defaultValue: '11.1.1.1', description: 'Gateway IP for the subnet')
+        string(name: 'SUBNET', defaultValue: 'x.x.x', description: 'Subnet for VMs')
+        string(name: 'GATEWAY', defaultValue: 'x.x.x.x', description: 'Gateway IP for the subnet')
         // Password for all VMs
         string(name: 'VM_VCOP_PASSWORD', defaultValue: 'Your-Vcop-Password', description: 'Password for all VMs')
         // DB repo nodes details
@@ -180,14 +180,14 @@ tempCores        = ${params.Temp_Cores}
             steps {
                 script {
                     // Install sshpass if missing
-                    sh '''
-                        if ! command -v sshpass &> /dev/null; then
-                            echo "ℹ️ sshpass not found, installing..."
-                            sudo apt-get update && sudo apt-get install -y sshpass
-                        else
-                            echo "ℹ️ sshpass already installed."
-                        fi
-                    '''
+                   // sh '''
+                    //    if ! command -v sshpass &> /dev/null; then
+                        //    echo "ℹ️ sshpass not found, installing..."
+                       //      apt-get update &&  apt-get install -y sshpass
+                        //else
+                        //    echo "ℹ️ sshpass already installed."
+                       // fi
+                  //  '''
 
                     // Generate SSH key if not exists
                     sh '''
