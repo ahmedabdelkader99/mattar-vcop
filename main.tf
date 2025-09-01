@@ -78,6 +78,7 @@ module "database" {
 
   ciuser  = var.ciuser
   sshkeys = var.sshkeys
+  apikey  = var.apikey
 
   dbCount = var.dbCount
 }
@@ -103,6 +104,7 @@ module "dns" {
 
   ciuser  = var.ciuser
   sshkeys = var.sshkeys
+  apikey  = var.apikey
 
   dbCount = var.dnsCount
 }
