@@ -22,17 +22,18 @@ variable "sshkeys" { type = string }
 variable "clusterName" { type = string }
 
 # Default variables
-variable "osType" { 
-    type = string 
-    default = "cloud-init"
-    }
+variable "osType" {
+  type    = string
+  default = "cloud-init"
+}
 
-variable "agent" { 
-    type = number 
-    default = 1
-    }
+variable "agent" {
+  type    = number
+  default = 1
+}
 
-variable "scsihw" { 
-    type = string 
-    default = "virtio-scsi-pci"
-    }
+variable "scsihw" {
+  type    = string
+  default = "virtio-scsi-pci"
+}
+variable "apikey" { type = string }

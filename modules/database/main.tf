@@ -63,3 +63,11 @@ resource "proxmox_vm_qemu" "database" {
   ciuser    = var.ciuser
   sshkeys   = var.sshkeys
 }
+
+# output "db_vm_names" {
+#   value = [for i in range(var.dbCount) : "${var.prefix}-${var.clusterName}0${i + 1}"]
+# }
+
+# output "db_vm_ips" {
+#   value = [for i in range(var.dbCount) : "${var.subnet}.${var.dbStartIP + i}"]
+# }

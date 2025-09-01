@@ -43,7 +43,8 @@ pipeline {
         string(name: 'K8S_STORAGE_IP', defaultValue: '199', description: 'IP for K8s Storage/load balancer')
 
         string(name: 'TEMPLATES_SRV_IP', defaultValue: '111', description: 'IP for Templates Server')
-
+        string(name: 'sshkeys', defaultValue: 'Your generated ssh key ', description: 'SSH public key for VM access')
+        string(name: 'ciuser', defaultValue: 'vpsie', description: 'user name for ssh access to VMs')
         string(name: 'CLONE_TEMPLATE', defaultValue: 'ci001', description: 'Base VM/template to clone')
         string(name: 'Temp_Mem', defaultValue: '2048', description: 'Memory (MB) for the template VM')
         string(name: 'Temp_Cores', defaultValue: '2', description: 'CPU cores for the template VM')
@@ -55,15 +56,22 @@ pipeline {
         string(name: 'DISK_SIZE', defaultValue: '40', description: 'Disk size (GB) per VM')
         string(name: 'SUBNET', defaultValue: 'x.x.x', description: 'Subnet for VMs')
         string(name: 'GATEWAY', defaultValue: 'x.x.x.x', description: 'Gateway IP for the subnet')
-        // Password for all VMs
         string(name: 'VM_VCOP_PASSWORD', defaultValue: 'Your-Vcop-Password', description: 'Password for all VMs')
-        // DB repo nodes details
         string(name: 'DB_HOST1_NAME', defaultValue: 'k8s-database01', description: 'DB node 1 hostname')
         string(name: 'DB_HOST1_IP', defaultValue: '10.x.x.x', description: 'DB node 1 IP address')
         string(name: 'DB_HOST2_NAME', defaultValue: 'k8s-database02', description: 'DB node 2 hostname')
         string(name: 'DB_HOST2_IP', defaultValue: '10.x.x.x', description: 'DB node 2 IP address')
         string(name: 'DB_HOST3_NAME', defaultValue: 'k8s-database03', description: 'DB node 3 hostname')
         string(name: 'DB_HOST3_IP', defaultValue: '10.x.x.x', description: 'DB node 3 IP address')
+
+        //
+        string(name: 'DNS_HOST1_NAME', defaultValue: 'dns01', description: 'DNS node 1 hostname')
+        string(name: 'DNS_HOST1_IP', defaultValue: '10.x.x.204', description: 'DNS node 1 IP address')
+        string(name: 'DNS_HOST2_NAME', defaultValue: 'dns02', description: 'DNS node 2 hostname')
+        string(name: 'DNS_HOST2_IP', defaultValue: '10.x.x.205', description: 'DNS node 2 IP address')
+        string(name: 'DNS_HOST3_NAME', defaultValue: 'dns03', description: 'DNS node 3 hostname')
+        string(name: 'DNS_HOST3_IP', defaultValue: '10.x.x.206', description: 'DNS node 3 IP address')
+        string(name: 'apikey', defaultValue: 'You can generate your API key using API Key Generator', description: 'API key for the setup')
     }
 
     stages {
@@ -116,8 +124,8 @@ k8sStartIP       = ${params.K8S_START_IP}
 dbStartIP        = ${params.DB_START_IP}
 dnsStartIP       = ${params.DNS_START_IP}
 templatesSrvIP   = ${params.TEMPLATES_SRV_IP}
-sshkeys          = ""
-ciuser           = "vpsie"
+sshkeys          = "${params.sshkeys}"
+ciuser           = "${params.ciuser}"
 
 masterCount      = ${params.MASTER_COUNT}
 masterMem        = ${params.MASTER_MEM}
@@ -149,6 +157,7 @@ proxyIP          = ${params.PROXY_IP}
 
 tempMem          = ${params.Temp_Mem}
 tempCores        = ${params.Temp_Cores}
+apikey           = "${params.apikey}"
 """
                     writeFile file: 'terraform.tfvars', text: tfvarsContent
                     sh "echo '✅ Generated terraform.tfvars:' && cat terraform.tfvars"
@@ -177,26 +186,15 @@ tempCores        = ${params.Temp_Cores}
         stage('Check VM Availability') {
             steps {
                 script {
-                    // Install sshpass if missing
-                   // sh '''
-                    //    if ! command -v sshpass &> /dev/null; then
-                        //    echo "ℹ️ sshpass not found, installing..."
-                       //      apt-get update &&  apt-get install -y sshpass
-                        //else
-                        //    echo "ℹ️ sshpass already installed."
-                       // fi
-                  //  '''
-
                     // Generate SSH key if not exists
-                    sh '''
-
-                        if [ ! -f ~/.ssh/id_rsa ]; then
-                            ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N ''
-                            echo "✅ SSH key generated."
-                        else
-                            echo "ℹ️ SSH key already exists."
-                        fi
-                    '''
+                   // sh '''
+                     //   if [ ! -f ~/.ssh/id_rsa ]; then
+                       //     ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N ''
+                         //   echo "✅ SSH key generated."
+                        //else
+                          //  echo "ℹ️ SSH key already exists."
+                        //fi
+                    //'''
 
                     def vmIPs = []
 
@@ -247,10 +245,20 @@ tempCores        = ${params.Temp_Cores}
                             echo "❌ VM ${ip} is not reachable after ${retries} attempts."
                             unreachableVMs.add(ip)
                         } else {
-                            // Copy SSH key to reachable VM
+                            // Write the sshkeys param to a temp file and copy it to the VM
+                            writeFile file: '/tmp/jenkins_sshkey.pub', text: "${params.sshkeys}"
+
+                            // check file exists
+                            sh 'ls -l /tmp/jenkins_sshkey.pub'
+                            echo '----------------------------------------'
                             sh """
-                                sshpass -p '${params.VM_VCOP_PASSWORD}' ssh-copy-id -i ~/.ssh/id_rsa.pub -o StrictHostKeyChecking=no root@${ip}
+                                chmod 644 /tmp/jenkins_sshkey.pub
+                                sshpass -p '${params.VM_VCOP_PASSWORD}' ssh-copy-id -f -i /tmp/jenkins_sshkey.pub -o StrictHostKeyChecking=no root@${ip}
                                 echo "✅ SSH key copied to ${ip}."
+                                echo "----------------------------------------"
+                                echo "ssh key for root@${ip}:"
+                                cat /tmp/jenkins_sshkey.pub
+                                echo "----------------------------------------"
                             """
                         }
                     }
@@ -263,21 +271,30 @@ tempCores        = ${params.Temp_Cores}
             }
         }
 
-        stage('db-cluster Repo') {
+        stage('DB Setup with Ansible') {
             steps {
                 dir('db-cluster') {
-                    git branch: 'main', url: 'https://code.k9.ms/vpsie/xtradb.git'
-                    sh 'ls -la'
                     script {
-                        echo '📋 Generating DB hosts file...'
+                        echo '📥 Cloning Git repo...'
+                        try {
+                            checkout([$class: 'GitSCM',
+                                branches: [[name: 'main']],
+                                userRemoteConfigs: [[
+                                    url: 'https://code.k9.ms/vpsie/xtradb.git',
+                                    credentialsId: 'codek9'
+                                ]]
+                            ])
+                            echo '✅ Git clone successful.'
+                        } catch (Exception e) {
+                            error "❌ Git clone failed: ${e.message}"
+                        }
 
+                        echo '📋 Generating DB hosts file...'
                         def hostsContent = """
 ${params.DB_HOST1_NAME} ansible_host=${params.DB_HOST1_IP} ansible_port=22
 ${params.DB_HOST2_NAME} ansible_host=${params.DB_HOST2_IP} ansible_port=22
 ${params.DB_HOST3_NAME} ansible_host=${params.DB_HOST3_IP} ansible_port=22
 """
-
-                        // Save to hosts file
                         writeFile file: 'hosts', text: hostsContent.trim()
 
                         echo '#################################'
@@ -286,12 +303,95 @@ ${params.DB_HOST3_NAME} ansible_host=${params.DB_HOST3_IP} ansible_port=22
                         echo '#################################'
 
                         echo '⚙️ Running DB Ansible playbook...'
-                        sh '''
-                            ansible-playbook -i hosts play-xtraDB.yml
-                        '''
+                        sh 'ansible-playbook -i hosts play-xtraDB.yml'
+                        echo '🛠️ Verifying XtraDB Cluster status...'
+                        sh """
+                        ssh -o StrictHostKeyChecking=no root@${params.DB_HOST1_IP} \\
+                        "mysql -u root -p'${params.VM_VCOP_PASSWORD}' -e \\"SHOW STATUS LIKE 'wsrep_cluster_size';\\""
+                        """
                     }
                 }
             }
         }
     }
 }
+        //DNS
+        stage('DB Setup with Ansible for DNS VMs') {
+            steps {
+                dir('db-cluster-for-dns vms') {
+                    script {
+                        echo '📥 Cloning Git repo...'
+                        try {
+                            checkout([$class: 'GitSCM',
+                                branches: [[name: 'main']],
+                                userRemoteConfigs: [[
+                                    url: 'https://code.k9.ms/vpsie/xtradb.git',
+                                    credentialsId: 'codek9'
+                                ]]
+                            ])
+                            echo '✅ Git clone successful.'
+                        } catch (Exception e) {
+                            error "❌ Git clone failed: ${e.message}"
+                        }
+
+                        echo '📋 Generating DB hosts file...'
+                        def hostsContent = """
+${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_NAME} ansible_port=22
+${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_NAME} ansible_port=22
+${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_NAME} ansible_port=22
+"""
+                        writeFile file: 'hosts', text: hostsContent.trim()
+
+                        echo '#################################'
+                        echo '📋 Contents of hosts file:'
+                        sh 'cat hosts'
+                        echo '#################################'
+
+                        echo '⚙️ Running DB Ansible playbook...'
+                        sh 'ansible-playbook -i hosts play-xtraDB.yml'
+                        echo '🛠️ Verifying XtraDB Cluster status...'
+                        sh """
+                        ssh -o StrictHostKeyChecking=no root@${params.DB_HOST1_IP} \\
+                        "mysql -u root -p'${params.VM_VCOP_PASSWORD}' -e \\"SHOW STATUS LIKE 'wsrep_cluster_size';\\""
+                        """
+                    }
+                }
+            }
+        }
+
+         stage('DNs Setup with Ansible') {
+            steps {
+                dir('Dns-setup') {
+                    script {
+                        echo '📥 Cloning Git repo...'
+                        try {
+                            checkout([$class: 'GitSCM',
+                                branches: [[name: 'main']],
+                                userRemoteConfigs: [[
+                                    url: 'https://code.k9.ms/vpsie/k8s-setup.git',
+                                    credentialsId: 'codek9'
+                                ]]
+                            ])
+                            echo '✅ Git clone successful.'
+                        } catch (Exception e) {
+                            error "❌ Git clone failed: ${e.message}"
+                        }
+
+                        echo '📋 Generating K8s hosts file...'
+                        def DnsHostsContent = """
+${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_IP} ansible_port=22
+${params.DNS_HOST2_NAME} ansible_host=${params.DNS_HOST2_IP} ansible_port=22
+${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
+"""
+                        writeFile file: 'hosts', text: DnsHostsContent.trim()
+                        echo '#################################'
+                        echo '📋 Contents of hosts file:'
+                        sh 'cat hosts'
+                        echo '#################################'
+                        echo '⚙️ Running DNS Ansible playbook...'
+                        sh 'ansible-playbook  play-dns.yml -i hosts -e apikey=${params.apikey}'
+                        echo '✅ DNS setup completed.'
+                    }
+                }
+            }
+         }
