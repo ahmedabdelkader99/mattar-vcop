@@ -58,20 +58,18 @@ pipeline {
         string(name: 'GATEWAY', defaultValue: 'x.x.x.x', description: 'Gateway IP for the subnet')
         string(name: 'VM_VCOP_PASSWORD', defaultValue: 'Your-Vcop-Password', description: 'Password for all VMs')
         string(name: 'DB_HOST1_NAME', defaultValue: 'k8s-database01', description: 'DB node 1 hostname')
-        string(name: 'DB_HOST1_IP', defaultValue: '10.x.x.x', description: 'DB node 1 IP address')
+        string(name: 'DB_HOST1_IP', defaultValue: '10.x.x.201', description: 'DB node 1 IP address')
         string(name: 'DB_HOST2_NAME', defaultValue: 'k8s-database02', description: 'DB node 2 hostname')
-        string(name: 'DB_HOST2_IP', defaultValue: '10.x.x.x', description: 'DB node 2 IP address')
+        string(name: 'DB_HOST2_IP', defaultValue: '10.x.x.202', description: 'DB node 2 IP address')
         string(name: 'DB_HOST3_NAME', defaultValue: 'k8s-database03', description: 'DB node 3 hostname')
-        string(name: 'DB_HOST3_IP', defaultValue: '10.x.x.x', description: 'DB node 3 IP address')
-
-        //
+        string(name: 'DB_HOST3_IP', defaultValue: '10.x.x.203', description: 'DB node 3 IP address')
         string(name: 'DNS_HOST1_NAME', defaultValue: 'dns01', description: 'DNS node 1 hostname')
         string(name: 'DNS_HOST1_IP', defaultValue: '10.x.x.204', description: 'DNS node 1 IP address')
         string(name: 'DNS_HOST2_NAME', defaultValue: 'dns02', description: 'DNS node 2 hostname')
         string(name: 'DNS_HOST2_IP', defaultValue: '10.x.x.205', description: 'DNS node 2 IP address')
         string(name: 'DNS_HOST3_NAME', defaultValue: 'dns03', description: 'DNS node 3 hostname')
         string(name: 'DNS_HOST3_IP', defaultValue: '10.x.x.206', description: 'DNS node 3 IP address')
-        string(name: 'apikey', defaultValue: 'You can generate your API key using API Key Generator', description: 'API key for the setup')
+        string(name: 'apikey', defaultValue: 'generate your API key using API Key Generator', description: 'API key for the setup')
     }
 
     stages {
@@ -158,6 +156,7 @@ proxyIP          = ${params.PROXY_IP}
 tempMem          = ${params.Temp_Mem}
 tempCores        = ${params.Temp_Cores}
 apikey           = "${params.apikey}"
+
 """
                     writeFile file: 'terraform.tfvars', text: tfvarsContent
                     sh "echo '✅ Generated terraform.tfvars:' && cat terraform.tfvars"
@@ -186,16 +185,6 @@ apikey           = "${params.apikey}"
         stage('Check VM Availability') {
             steps {
                 script {
-                    // Generate SSH key if not exists
-                   // sh '''
-                     //   if [ ! -f ~/.ssh/id_rsa ]; then
-                       //     ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N ''
-                         //   echo "✅ SSH key generated."
-                        //else
-                          //  echo "ℹ️ SSH key already exists."
-                        //fi
-                    //'''
-
                     def vmIPs = []
 
                     // DB VMs
@@ -313,12 +302,10 @@ ${params.DB_HOST3_NAME} ansible_host=${params.DB_HOST3_IP} ansible_port=22
                 }
             }
         }
-    }
-}
-        //DNS
+
         stage('DB Setup with Ansible for DNS VMs') {
             steps {
-                dir('db-cluster-for-dns vms') {
+                dir('db-cluster-for-dns-vms') {
                     script {
                         echo '📥 Cloning Git repo...'
                         try {
@@ -333,12 +320,12 @@ ${params.DB_HOST3_NAME} ansible_host=${params.DB_HOST3_IP} ansible_port=22
                         } catch (Exception e) {
                             error "❌ Git clone failed: ${e.message}"
                         }
-
-                        echo '📋 Generating DB hosts file...'
+                        echo '#################### DB REPO FOR DNS VMS  #############################'
+                        echo '📋 Generating DNS hosts file...'
                         def hostsContent = """
-${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_NAME} ansible_port=22
-${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_NAME} ansible_port=22
-${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_NAME} ansible_port=22
+${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_IP} ansible_port=22
+${params.DNS_HOST2_NAME} ansible_host=${params.DNS_HOST2_IP} ansible_port=22
+${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
 """
                         writeFile file: 'hosts', text: hostsContent.trim()
 
@@ -349,7 +336,8 @@ ${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_NAME} ansible_port=22
 
                         echo '⚙️ Running DB Ansible playbook...'
                         sh 'ansible-playbook -i hosts play-xtraDB.yml'
-                        echo '🛠️ Verifying XtraDB Cluster status...'
+
+                        echo '🛠️ Verifying XtraDB Cluster  for Dns vms status...'
                         sh """
                         ssh -o StrictHostKeyChecking=no root@${params.DB_HOST1_IP} \\
                         "mysql -u root -p'${params.VM_VCOP_PASSWORD}' -e \\"SHOW STATUS LIKE 'wsrep_cluster_size';\\""
@@ -359,7 +347,7 @@ ${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_NAME} ansible_port=22
             }
         }
 
-         stage('DNs Setup with Ansible') {
+        stage('DNS Setup with Ansible') {
             steps {
                 dir('Dns-setup') {
                     script {
@@ -368,7 +356,7 @@ ${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_NAME} ansible_port=22
                             checkout([$class: 'GitSCM',
                                 branches: [[name: 'main']],
                                 userRemoteConfigs: [[
-                                    url: 'https://code.k9.ms/vpsie/k8s-setup.git',
+                                    url: 'https://code.k9.ms/vpsie/xtradb.git',
                                     credentialsId: 'codek9'
                                 ]]
                             ])
@@ -376,22 +364,26 @@ ${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_NAME} ansible_port=22
                         } catch (Exception e) {
                             error "❌ Git clone failed: ${e.message}"
                         }
-
-                        echo '📋 Generating K8s hosts file...'
+                        echo '#################### DNS REPO FOR DNS VMS  #############################'
+                        echo '📋 Generating DNS hosts file...'
                         def DnsHostsContent = """
 ${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_IP} ansible_port=22
 ${params.DNS_HOST2_NAME} ansible_host=${params.DNS_HOST2_IP} ansible_port=22
 ${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
 """
                         writeFile file: 'hosts', text: DnsHostsContent.trim()
+
                         echo '#################################'
-                        echo '📋 Contents of hosts file:'
+                        echo '📋 Contents of DNS hosts file:'
                         sh 'cat hosts'
                         echo '#################################'
+
                         echo '⚙️ Running DNS Ansible playbook...'
-                        sh 'ansible-playbook  play-dns.yml -i hosts -e apikey=${params.apikey}'
+                        sh "ansible-playbook -i hosts play-pdns.yml -e apikey=${params.apikey}"
                         echo '✅ DNS setup completed.'
                     }
                 }
             }
-         }
+        }
+    }
+}
