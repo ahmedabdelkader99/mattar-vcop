@@ -182,6 +182,19 @@ apikey           = "${params.apikey}"
             }
         }
 
+        stage('List Created VMs') {
+            steps {
+                sh '''
+                     # Save human-readable Terraform state to a file
+                    echo "📋 Created VMs:***********************"
+                     terraform show > terraform_output.txt
+                     echo "**************************************"
+                     cat terraform_output.txt
+                     echo "**************************************"
+                    '''
+            }
+        }
+
         stage('Check VM Availability') {
             steps {
                 script {
@@ -260,7 +273,7 @@ apikey           = "${params.apikey}"
             }
         }
 
-        stage('DB Setup with Ansible') {
+        stage('Build a Database Cluster for the platform.') {
             steps {
                 dir('db-cluster') {
                     script {
@@ -298,12 +311,15 @@ ${params.DB_HOST3_NAME} ansible_host=${params.DB_HOST3_IP} ansible_port=22
                         ssh -o StrictHostKeyChecking=no root@${params.DB_HOST1_IP} \\
                         "mysql -u root -p'${params.VM_VCOP_PASSWORD}' -e \\"SHOW STATUS LIKE 'wsrep_cluster_size';\\""
                         """
+                        echo '⚙️ Install MongoDB (on the same VMs as the DB)...'
+                        sh 'ansible-playbook -i hosts play-mongo.yml'
+                        echo '✅ ✅ ✅ ✅ ✅ ✅ Database cluster setup completed.✅ ✅ ✅ ✅ ✅ ✅'
                     }
                 }
             }
         }
 
-        stage('DB Setup with Ansible for DNS VMs') {
+        stage('Build and Configure DB On DNS Servers for the platform.') {
             steps {
                 dir('db-cluster-for-dns-vms') {
                     script {
@@ -336,18 +352,12 @@ ${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
 
                         echo '⚙️ Running DB Ansible playbook...'
                         sh 'ansible-playbook -i hosts play-xtraDB.yml'
-
-                        echo '🛠️ Verifying XtraDB Cluster  for Dns vms status...'
-                        sh """
-                        ssh -o StrictHostKeyChecking=no root@${params.DB_HOST1_IP} \\
-                        "mysql -u root -p'${params.VM_VCOP_PASSWORD}' -e \\"SHOW STATUS LIKE 'wsrep_cluster_size';\\""
-                        """
                     }
                 }
             }
         }
 
-        stage('DNS Setup with Ansible') {
+        stage('Build and Configure DNS Servers for the platform.') {
             steps {
                 dir('Dns-setup') {
                     script {
@@ -380,7 +390,14 @@ ${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
 
                         echo '⚙️ Running DNS Ansible playbook...'
                         sh "ansible-playbook -i hosts play-pdns.yml -e apikey=${params.apikey}"
-                        echo '✅ DNS setup completed.'
+                        echo '🛠️ Waiting for DNS service on port 8080...'
+                        sleep 60
+                        sh """
+                        ssh -o StrictHostKeyChecking=no root@${params.DNS_HOST3_IP} \\
+                        "echo 'Checking DNS service status on port 8081...'; \\
+                        curl -o /dev/null -s -w '%{http_code}' http://${params.DNS_HOST3_IP}:8081/"
+                        """
+                        echo '✅ ✅ ✅ ✅ ✅ ✅Build and Configure DNS Servers for the platform.✅ ✅ ✅ ✅ ✅ ✅'
                     }
                 }
             }

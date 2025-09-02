@@ -58,11 +58,18 @@ pipeline {
         string(name: 'GATEWAY', defaultValue: 'x.x.x.x', description: 'Gateway IP for the subnet')
         string(name: 'VM_VCOP_PASSWORD', defaultValue: 'Your-Vcop-Password', description: 'Password for all VMs')
         string(name: 'DB_HOST1_NAME', defaultValue: 'k8s-database01', description: 'DB node 1 hostname')
-        string(name: 'DB_HOST1_IP', defaultValue: '10.x.x.x', description: 'DB node 1 IP address')
+        string(name: 'DB_HOST1_IP', defaultValue: '10.x.x.201', description: 'DB node 1 IP address')
         string(name: 'DB_HOST2_NAME', defaultValue: 'k8s-database02', description: 'DB node 2 hostname')
-        string(name: 'DB_HOST2_IP', defaultValue: '10.x.x.x', description: 'DB node 2 IP address')
+        string(name: 'DB_HOST2_IP', defaultValue: '10.x.x.202', description: 'DB node 2 IP address')
         string(name: 'DB_HOST3_NAME', defaultValue: 'k8s-database03', description: 'DB node 3 hostname')
-        string(name: 'DB_HOST3_IP', defaultValue: '10.x.x.x', description: 'DB node 3 IP address')
+        string(name: 'DB_HOST3_IP', defaultValue: '10.x.x.203', description: 'DB node 3 IP address')
+        string(name: 'DNS_HOST1_NAME', defaultValue: 'dns01', description: 'DNS node 1 hostname')
+        string(name: 'DNS_HOST1_IP', defaultValue: '10.x.x.204', description: 'DNS node 1 IP address')
+        string(name: 'DNS_HOST2_NAME', defaultValue: 'dns02', description: 'DNS node 2 hostname')
+        string(name: 'DNS_HOST2_IP', defaultValue: '10.x.x.205', description: 'DNS node 2 IP address')
+        string(name: 'DNS_HOST3_NAME', defaultValue: 'dns03', description: 'DNS node 3 hostname')
+        string(name: 'DNS_HOST3_IP', defaultValue: '10.x.x.206', description: 'DNS node 3 IP address')
+        string(name: 'apikey', defaultValue: 'generate your API key using API Key Generator', description: 'API key for the setup')
     }
 
     stages {
@@ -148,6 +155,8 @@ proxyIP          = ${params.PROXY_IP}
 
 tempMem          = ${params.Temp_Mem}
 tempCores        = ${params.Temp_Cores}
+apikey           = "${params.apikey}"
+
 """
                     writeFile file: 'terraform.tfvars', text: tfvarsContent
                     sh "echo '✅ Generated terraform.tfvars:' && cat terraform.tfvars"
@@ -176,16 +185,6 @@ tempCores        = ${params.Temp_Cores}
         stage('Check VM Availability') {
             steps {
                 script {
-                    // Generate SSH key if not exists
-                   // sh '''
-                     //   if [ ! -f ~/.ssh/id_rsa ]; then
-                       //     ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N ''
-                         //   echo "✅ SSH key generated."
-                        //else
-                          //  echo "ℹ️ SSH key already exists."
-                        //fi
-                    //'''
-
                     def vmIPs = []
 
                     // DB VMs
@@ -261,7 +260,7 @@ tempCores        = ${params.Temp_Cores}
             }
         }
 
-        stage('db-cluster Repo') {
+        stage('Build a Database Cluster for the platform.') {
             steps {
                 dir('db-cluster') {
                     script {
@@ -299,6 +298,93 @@ ${params.DB_HOST3_NAME} ansible_host=${params.DB_HOST3_IP} ansible_port=22
                         ssh -o StrictHostKeyChecking=no root@${params.DB_HOST1_IP} \\
                         "mysql -u root -p'${params.VM_VCOP_PASSWORD}' -e \\"SHOW STATUS LIKE 'wsrep_cluster_size';\\""
                         """
+                        echo '⚙️ Install MongoDB (on the same VMs as the DB)...'
+                        sh 'ansible-playbook -i hosts play-mongo.yml'
+                        echo '✅ ✅ ✅ ✅ ✅ ✅ Database cluster setup completed.✅ ✅ ✅ ✅ ✅ ✅'
+                    }
+                }
+            }
+        }
+
+        stage('Build and Configure DB On DNS Servers for the platform.') {
+            steps {
+                dir('db-cluster-for-dns-vms') {
+                    script {
+                        echo '📥 Cloning Git repo...'
+                        try {
+                            checkout([$class: 'GitSCM',
+                                branches: [[name: 'main']],
+                                userRemoteConfigs: [[
+                                    url: 'https://code.k9.ms/vpsie/xtradb.git',
+                                    credentialsId: 'codek9'
+                                ]]
+                            ])
+                            echo '✅ Git clone successful.'
+                        } catch (Exception e) {
+                            error "❌ Git clone failed: ${e.message}"
+                        }
+                        echo '#################### DB REPO FOR DNS VMS  #############################'
+                        echo '📋 Generating DNS hosts file...'
+                        def hostsContent = """
+${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_IP} ansible_port=22
+${params.DNS_HOST2_NAME} ansible_host=${params.DNS_HOST2_IP} ansible_port=22
+${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
+"""
+                        writeFile file: 'hosts', text: hostsContent.trim()
+
+                        echo '#################################'
+                        echo '📋 Contents of hosts file:'
+                        sh 'cat hosts'
+                        echo '#################################'
+
+                        echo '⚙️ Running DB Ansible playbook...'
+                        sh 'ansible-playbook -i hosts play-xtraDB.yml'
+
+                        echo '🛠️ Verifying XtraDB Cluster  for Dns vms status...'
+                        sh """
+                        ssh -o StrictHostKeyChecking=no root@${params.DB_HOST1_IP} \\
+                        "mysql -u root -p'${params.VM_VCOP_PASSWORD}' -e \\"SHOW STATUS LIKE 'wsrep_cluster_size';\\""
+                        """
+                        echo '✅ ✅ ✅ ✅ ✅ ✅ Build and Configure DB On DNS Servers for the platform.✅ ✅ ✅ ✅ ✅ ✅'
+                    }
+                }
+            }
+        }
+
+        stage('Build and Configure DNS Servers for the platform.') {
+            steps {
+                dir('Dns-setup') {
+                    script {
+                        echo '📥 Cloning Git repo...'
+                        try {
+                            checkout([$class: 'GitSCM',
+                                branches: [[name: 'main']],
+                                userRemoteConfigs: [[
+                                    url: 'https://code.k9.ms/vpsie/xtradb.git',
+                                    credentialsId: 'codek9'
+                                ]]
+                            ])
+                            echo '✅ Git clone successful.'
+                        } catch (Exception e) {
+                            error "❌ Git clone failed: ${e.message}"
+                        }
+                        echo '#################### DNS REPO FOR DNS VMS  #############################'
+                        echo '📋 Generating DNS hosts file...'
+                        def DnsHostsContent = """
+${params.DNS_HOST1_NAME} ansible_host=${params.DNS_HOST1_IP} ansible_port=22
+${params.DNS_HOST2_NAME} ansible_host=${params.DNS_HOST2_IP} ansible_port=22
+${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
+"""
+                        writeFile file: 'hosts', text: DnsHostsContent.trim()
+
+                        echo '#################################'
+                        echo '📋 Contents of DNS hosts file:'
+                        sh 'cat hosts'
+                        echo '#################################'
+
+                        echo '⚙️ Running DNS Ansible playbook...'
+                        sh "ansible-playbook -i hosts play-pdns.yml -e apikey=${params.apikey}"
+                        echo '✅ ✅ ✅ ✅ ✅ ✅Build and Configure DNS Servers for the platform.✅ ✅ ✅ ✅ ✅ ✅'
                     }
                 }
             }
