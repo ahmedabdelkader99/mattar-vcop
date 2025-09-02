@@ -1,14 +1,5 @@
-# output "k8s_master_ips" {
-#   value = module.kubernetes.masters
-
-# }
 output "k8s_master_ips" {
-  value = [
-    for i, ip in module.kubernetes.masters : {
-      hostname = module.kubernetes.masters_hostnames[i] # <-- needs to exist in the module
-      ip       = ip
-    }
-  ]
+  value = module.kubernetes.masters
 }
 
 output "k8s_workers_ips" {
