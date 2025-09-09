@@ -188,9 +188,9 @@ apikey           = "${params.apikey}"
                      # Save human-readable Terraform state to a file
                     echo "📋 Created VMs:***********************"
                      terraform show > terraform_output.txt
-                     echo "**************************************"
+                     echo "************__________________________________________***************"
                      cat terraform_output.txt
-                     echo "**************************************"
+                     echo "************__________________________________________***************"
                     '''
             }
         }
@@ -239,7 +239,7 @@ apikey           = "${params.apikey}"
                                 break
                             } else {
                                 echo "⚠️ Attempt ${attempt} - VM ${ip} is not reachable yet ..."
-                                sleep 60
+                                sleep 90
                             }
                         }
 
@@ -299,21 +299,52 @@ ${params.DB_HOST3_NAME} ansible_host=${params.DB_HOST3_IP} ansible_port=22
 """
                         writeFile file: 'hosts', text: hostsContent.trim()
 
-                        echo '#################################'
-                        echo '📋 Contents of hosts file:'
+                        echo '#################################*********************#######################'
+                        echo '📋 📋 📋 📋  Contents of hosts file:'
                         sh 'cat hosts'
-                        echo '#################################'
+                        echo '#################################********************########################'
+                        echo 'CHECKING IF MYSQL IS RUNNING ON VMS: ⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️'
 
-                        echo '⚙️ Running DB Ansible playbook...'
-                        sh 'ansible-playbook -i hosts play-xtraDB.yml'
+                        def mysqlStatus = sh(
+                            script: """
+                            ssh -o StrictHostKeyChecking=no root@${params.DB_HOST2_IP} \\
+                            "systemctl status mysql"
+                            """,
+                            returnStatus: true
+                        )
+                        // Check Galera cluster size
+                        def clusterSize = sh(
+                            script: """
+                                ssh -o StrictHostKeyChecking=no root@${params.DB_HOST1_IP} \\
+                                "mysql -u root -p'${params.VM_VCOP_PASSWORD}' -N -s -e \\"SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='wsrep_cluster_size';\\" | awk '{print \\\$1}'"
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        // Convert to integer for comparison
+                        def clusterSizeInt = clusterSize.toInteger() ? clusterSize.toInteger() : 0
+                        echo '##################*************###################'
+                        echo "🔍 Cluster size detected from the function = ${clusterSizeInt}"
+                        echo '##################*************###################'
+
+                        if (mysqlStatus != 0 || clusterSizeInt != 3) {
+                            // MySQL is NOT running, run the playbook
+                            echo '⚙️ MySQL not running. Running DB Ansible playbook...'
+                            sh 'ansible-playbook -i hosts play-xtraDB.yml'
+                        } else {
+                            // MySQL is running, skip playbook
+                            echo '✅ MySQL is already running. Skipping Ansible playbook.'
+                        }
+
                         echo '🛠️ Verifying XtraDB Cluster status...'
                         sh """
                         ssh -o StrictHostKeyChecking=no root@${params.DB_HOST1_IP} \\
                         "mysql -u root -p'${params.VM_VCOP_PASSWORD}' -e \\"SHOW STATUS LIKE 'wsrep_cluster_size';\\""
                         """
+
                         echo '⚙️ Install MongoDB (on the same VMs as the DB)...'
                         sh 'ansible-playbook -i hosts play-mongo.yml'
-                        echo '✅ ✅ ✅ ✅ ✅ ✅ Database cluster setup completed.✅ ✅ ✅ ✅ ✅ ✅'
+                        echo 'Database cluster setup completed.✅ ✅ ✅ ✅ ✅ ✅'
                     }
                 }
             }
@@ -390,14 +421,15 @@ ${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
 
                         echo '⚙️ Running DNS Ansible playbook...'
                         sh "ansible-playbook -i hosts play-pdns.yml -e apikey=${params.apikey}"
-                        echo '🛠️ Waiting for DNS service on port 8080...'
-                        sleep 60
+                        echo '🛠️ Waiting for DNS service on port 8081...'
+                        sleep 90
                         sh """
-                        ssh -o StrictHostKeyChecking=no root@${params.DNS_HOST3_IP} \\
-                        "echo 'Checking DNS service status on port 8081...'; \\
-                        curl -o /dev/null -s -w '%{http_code}' http://${params.DNS_HOST3_IP}:8081/"
+                        ssh -o StrictHostKeyChecking=no root@${params.DNS_HOST3_IP} bash -c '
+                        status=\$(curl -o /dev/null -s -w "%{http_code}" http://${params.DNS_HOST3_IP}:8081)
+                        echo "✅ DNS service check completed on ${params.DNS_HOST3_IP} with status code = \$status"
+                        '
                         """
-                        echo '✅ ✅ ✅ ✅ ✅ ✅Build and Configure DNS Servers for the platform.✅ ✅ ✅ ✅ ✅ ✅'
+                        echo 'Build and Configure DNS Servers for the platform.✅ ✅ ✅ ✅ ✅ ✅'
                     }
                 }
             }
