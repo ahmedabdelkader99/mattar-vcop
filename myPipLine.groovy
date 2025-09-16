@@ -43,7 +43,7 @@ pipeline {
         string(name: 'K8S_STORAGE_IP', defaultValue: '199', description: 'IP for K8s Storage/load balancer')
 
         string(name: 'TEMPLATES_SRV_IP', defaultValue: '111', description: 'IP for Templates Server')
-        string(name: 'sshkeys', defaultValue: 'Your generated ssh key ', description: 'SSH public key for VM access')
+        //string(name: 'sshkeys', defaultValue: 'Your generated ssh key ', description: 'SSH public key for VM access')
         string(name: 'ciuser', defaultValue: 'vpsie', description: 'user name for ssh access to VMs')
         string(name: 'CLONE_TEMPLATE', defaultValue: 'ci001', description: 'Base VM/template to clone')
         string(name: 'Temp_Mem', defaultValue: '2048', description: 'Memory (MB) for the template VM')
@@ -200,6 +200,16 @@ apikey           = "${params.apikey}"
                 script {
                     def vmIPs = []
 
+                    // ✅ Generate SSH key once outside the loop
+                    sh '''
+                        echo "🧹 Cleaning old SSH keys..."
+                        rm -f /var/jenkins_home/.ssh/id_rsa /var/jenkins_home/.ssh/id_rsa.pub
+
+                        echo "🔑 Generating SSH keypair once for this pipeline run..."
+                        ssh-keygen -t rsa -b 4096 -f /var/jenkins_home/.ssh/id_rsa -N "" -q
+                        chmod 600 /var/jenkins_home/.ssh/id_rsa
+                    '''
+
                     // DB VMs
                     for (int i = 0; i < params.DB_COUNT.toInteger(); i++) {
                         vmIPs.add("${params.SUBNET}.${params.DB_START_IP.toInteger() + i}")
@@ -247,20 +257,31 @@ apikey           = "${params.apikey}"
                             echo "❌ VM ${ip} is not reachable after ${retries} attempts."
                             unreachableVMs.add(ip)
                         } else {
-                            // Write the sshkeys param to a temp file and copy it to the VM
-                            writeFile file: '/tmp/jenkins_sshkey.pub', text: "${params.sshkeys}"
+                            echo '--------------SSHKEY--------------------------'
+                              // ✅ Reuse the already-generated key for all VMs
 
-                            // check file exists
-                            sh 'ls -l /tmp/jenkins_sshkey.pub'
-                            echo '----------------------------------------'
                             sh """
-                                chmod 644 /tmp/jenkins_sshkey.pub
-                                sshpass -p '${params.VM_VCOP_PASSWORD}' ssh-copy-id -f -i /tmp/jenkins_sshkey.pub -o StrictHostKeyChecking=no root@${ip}
+                                ssh-keygen -R ${ip} || true
+                                echo "📤 Copying public key to ${ip} ..."
+                                sshpass -p '${params.VM_VCOP_PASSWORD}' ssh-copy-id -f -i /var/jenkins_home/.ssh/id_rsa.pub -o StrictHostKeyChecking=no root@${ip}
+
+                                sshpass -p '${params.VM_VCOP_PASSWORD}' ssh -o StrictHostKeyChecking=no root@${ip} '''
+                                    # Update sshd_config to allow root login and public key authentication
+                                    sed -i "s/^#\\?PermitRootLogin.*/PermitRootLogin yes/" /etc/ssh/sshd_config
+                                    sed -i "s/^#\\?PubkeyAuthentication.*/PubkeyAuthentication yes/" /etc/ssh/sshd_config
+
+                                    # Ensure AuthorizedKeysFile is set
+                                    grep -q "^AuthorizedKeysFile" /etc/ssh/sshd_config || echo "AuthorizedKeysFile .ssh/authorized_keys" >> /etc/ssh/sshd_config
+
+                                    # Restart SSH service
+                                    systemctl restart sshd
+                                '''
+
                                 echo "✅ SSH key copied to ${ip}."
-                                echo "----------------------------------------"
-                                echo "ssh key for root@${ip}:"
-                                cat /tmp/jenkins_sshkey.pub
-                                echo "----------------------------------------"
+                                echo "-------------------------#########################---------------"
+                                echo "Your SSH private key (keep it secret!):"
+                                cat /var/jenkins_home/.ssh/id_rsa
+                                echo "--------------------###############################--------------------"
                             """
                         }
                     }
@@ -305,29 +326,37 @@ ${params.DB_HOST3_NAME} ansible_host=${params.DB_HOST3_IP} ansible_port=22
                         echo '#################################********************########################'
                         echo 'CHECKING IF MYSQL IS RUNNING ON VMS: ⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️⚙️'
 
+                        // Check if MySQL client exists on the VM
+                        def mysqlClientInstalled = sh(
+                            script: """
+                                ssh -o StrictHostKeyChecking=no root@${params.DB_HOST1_IP} "command -v mysql >/dev/null 2>&1"
+                            """,
+                            returnStatus: true
+                        )
+
                         def mysqlStatus = sh(
                             script: """
                             ssh -o StrictHostKeyChecking=no root@${params.DB_HOST2_IP} \\
-                            "systemctl status mysql"
+                            "systemctl is-active --quiet mysql  "
                             """,
                             returnStatus: true
                         )
                         // Check Galera cluster size
-                        def clusterSize = sh(
-                            script: """
-                                ssh -o StrictHostKeyChecking=no root@${params.DB_HOST1_IP} \\
-                                "mysql -u root -p'${params.VM_VCOP_PASSWORD}' -N -s -e \\"SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='wsrep_cluster_size';\\" | awk '{print \\\$1}'"
-                            """,
-                            returnStdout: true
-                        ).trim()
+                       // def clusterSize = sh(
+                         //   script: """
+                           //     ssh -o StrictHostKeyChecking=no root@${params.DB_HOST1_IP} \\
+                             //   "mysql -u root -p'${params.VM_VCOP_PASSWORD}' -N -s -e \\"SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME='wsrep_cluster_size';\\" | awk '{print \\\$1}'"
+                            //""",
+                            //returnStdout: true
+                        //).trim()
 
                         // Convert to integer for comparison
-                        def clusterSizeInt = clusterSize.toInteger() ? clusterSize.toInteger() : 0
-                        echo '##################*************###################'
-                        echo "🔍 Cluster size detected from the function = ${clusterSizeInt}"
-                        echo '##################*************###################'
+                      //  def clusterSizeInt = clusterSize.toInteger() ? clusterSize.toInteger() : 0
+                       // echo '##################*************###################'
+                        //echo "🔍 Cluster size detected from the function = ${clusterSizeInt}"
+                        //echo '##################*************###################'
 
-                        if (mysqlStatus != 0 || clusterSizeInt != 3) {
+                        if (mysqlClientInstalled != 0 || mysqlStatus != 0) {
                             // MySQL is NOT running, run the playbook
                             echo '⚙️ MySQL not running. Running DB Ansible playbook...'
                             sh 'ansible-playbook -i hosts play-xtraDB.yml'
