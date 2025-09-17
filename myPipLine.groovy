@@ -184,13 +184,27 @@ apikey           = "${params.apikey}"
 
         stage('List Created VMs') {
             steps {
-                sh '''
-                     # Save human-readable Terraform state to a file
-                    echo "📋 Created VMs:***********************"
-                     terraform show > terraform_output.txt
-                     echo "************__________________________________________***************"
-                     cat terraform_output.txt
-                     echo "************__________________________________________***************"
+                    sh '''
+                        echo "📋 Getting Terraform outputs in JSON..."
+                        terraform output -json > terraform_output.json
+                        cat terraform_output.json
+                        echo "terraform_output.json created in workspace ✅"
+                        echo "******************************************************"
+
+                        echo "📋 Parsing terraform_output.json and creating hosts file..."
+                        > hosts
+
+                        # Extract all values (arrays or single IPs) and filter IPv4 addresses
+                        jq -r '
+                        .[]
+                        | .value
+                        | if type=="array" then .[] else . end
+                        ' terraform_output.json | grep -Eo '^[0-9.]+$' >> hosts
+
+                        echo "******************************************************"
+                        echo "✅ Generated hosts file content:"
+                        cat hosts
+                        echo "******************************************************"
                     '''
             }
         }
@@ -233,6 +247,8 @@ apikey           = "${params.apikey}"
                     // Proxy, Templates, Backup
                     vmIPs.add("${params.SUBNET}.${params.PROXY_IP.toInteger()}")
                     vmIPs.add("${params.SUBNET}.${params.TEMPLATES_SRV_IP.toInteger()}")
+                    vmIPs.add("${params.SUBNET}.${params.K8S_STORAGE_IP.toInteger()}")
+                    vmIPs.add("${params.SUBNET}.${params.K8S_PROXY_IP.toInteger()}")
 
                     def unreachableVMs = []
 
@@ -293,6 +309,109 @@ apikey           = "${params.apikey}"
                 }
             }
         }
+        stage('Deploy the K8s Cluster') {
+            steps {
+                script {
+                    sh '''
+                        echo "📋 Getting Terraform outputs in JSON..."
+                        terraform output -json > terraform_output.json
+                        echo "✅ terraform_output.json created"
+                        echo "******************************************************"
+                        cat terraform_output.json
+                        echo "******************************************************"
+
+                        echo "📋 Parsing terraform_output.json and creating grouped Ansible hosts file..."
+                        > hosts
+
+                        # Build [all] group with everything except dns/template/haproxy/database/k8s_storage
+                        echo "[all]" >> hosts
+                        jq -r '
+                        to_entries[]
+                        | select(.key != "dns" and .key != "template_srv_ip" and .key != "haproxy_ip" and .key != "database" and .key != "k8s_storage_ip")
+                        | .value.value
+                        | if type=="array" then .[] else . end
+                        ' terraform_output.json | grep -Eo '^[0-9.]+$' | while read ip; do
+                            echo "${ip} ansible_host=${ip} ansible_user=root ansible_ssh_private_key_file=/var/jenkins_home/.ssh/id_rsa" >> hosts
+                        done
+                        echo "" >> hosts
+
+                        # Masters
+                        echo "[masters]" >> hosts
+                        jq -r '.k8s_master_ips.value[]' terraform_output.json | while read ip; do
+                            echo "${ip} ansible_host=${ip} ansible_user=root ansible_ssh_private_key_file=/var/jenkins_home/.ssh/id_rsa" >> hosts
+                        done
+                        echo "" >> hosts
+
+                        # Workers
+                        echo "[workers]" >> hosts
+                        jq -r '.k8s_workers_ips.value[]' terraform_output.json | while read ip; do
+                            echo "${ip} ansible_host=${ip} ansible_user=root ansible_ssh_private_key_file=/var/jenkins_home/.ssh/id_rsa" >> hosts
+                        done
+                        echo "" >> hosts
+
+                        # Load balancer
+                        echo "[lb]" >> hosts
+                        jq -r '.k8s_proxy_ip.value' terraform_output.json | while read ip; do
+                            echo "${ip} ansible_host=${ip} ansible_user=root ansible_ssh_private_key_file=/var/jenkins_home/.ssh/id_rsa" >> hosts
+                        done
+                        echo "" >> hosts
+
+                        echo "******************************************************"
+                        echo "✅ Generated Ansible hosts inventory with groups:"
+                        cat hosts
+                        echo "******************************************************"
+
+                        echo "🔧 Creating ansible.cfg..."
+                        cat > ansible.cfg <<EOF
+        [defaults]
+        host_key_checking = False
+        inventory = hosts
+        remote_user = root
+        private_key_file = /var/jenkins_home/.ssh/id_rsa
+        EOF
+                        echo "✅ ansible.cfg created"
+                    '''
+
+                    // Jenkins can still access the file content if needed
+                    def hostsContent = readFile('hosts')
+                    writeFile file: 'hosts', text: hostsContent
+
+                    dir('k8s-repo-setup') {
+                        echo '📥 Cloning k8s repo...'
+                        try {
+                            checkout([$class: 'GitSCM',
+                                branches: [[name: 'main']],
+                                userRemoteConfigs: [[
+                                    url: 'https://code.k9.ms/ahmad.abd-alkadir/k8s-new-setup.git',
+                                    credentialsId: 'codek9'
+                                ]]
+                            ])
+                            echo '✅ Git k8s repo clone successful.'
+                        } catch (Exception e) {
+                            error "❌ Git clone failed: ${e.message}"
+                        }
+
+                        echo '⚙️ Running K8S repo Ansible playbook...'
+                        sh 'ansible-playbook -i ../hosts k8s.yml'
+                        if (currentBuild.result == 'FAILURE') {
+                            error '❌ K8s Ansible playbook failed. Check the logs above for details.'
+                        } else {
+                            echo '✅ K8s Ansible playbook completed successfully.'
+                        }
+                    }
+                        echo '🛠️ Verifying Kubernetes cluster status...'
+                        sh '''
+                        echo "🛠️ Getting first master node IP..."
+                        MASTER1=$(jq -r '.k8s_master_ips.value[0]' terraform_output.json)
+                        echo "Master1 IP: $MASTER1"
+
+                        echo "🛠️ Verifying Kubernetes cluster status on Master1..."
+                        ssh -o StrictHostKeyChecking=no root@$MASTER1 "kubectl get nodes --kubeconfig /etc/kubernetes/admin.conf"
+                        echo "✅ Kubernetes cluster verification completed."
+                    '''
+                }
+            }
+        }
 
         stage('Build a Database Cluster for the platform.') {
             steps {
@@ -307,7 +426,7 @@ apikey           = "${params.apikey}"
                                     credentialsId: 'codek9'
                                 ]]
                             ])
-                            echo '✅ Git clone successful.'
+                            echo '✅ Git  Database Cluster clone successful.'
                         } catch (Exception e) {
                             error "❌ Git clone failed: ${e.message}"
                         }
@@ -412,6 +531,7 @@ ${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
 
                         echo '⚙️ Running DB Ansible playbook...'
                         sh 'ansible-playbook -i hosts play-xtraDB.yml'
+                        echo ' Database cluster setup completed On DNS Servers for the platform.✅ ✅ ✅ ✅ ✅ ✅'
                     }
                 }
             }
