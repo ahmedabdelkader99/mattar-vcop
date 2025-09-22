@@ -570,6 +570,11 @@ ${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
 
                         echo '⚙️ Running DNS Ansible playbook...'
                         sh "ansible-playbook -i hosts play-pdns.yml -e apikey=${params.apikey}"
+                        if (currentBuild.result == 'FAILURE') {
+                            error '❌ DNS Ansible playbook failed. Check the logs above for details.'
+                        } else {
+                            echo '✅ DNS Ansible playbook completed successfully.'
+                        }
                         echo '🛠️ Waiting for DNS service on port 8081...'
                         sleep 90
                         sh """
@@ -578,7 +583,7 @@ ${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
                         echo "✅ DNS service check completed on ${params.DNS_HOST3_IP} with status code = \$status"
                         '
                         """
-                        echo 'Build and Configure DNS Servers for the platform.✅ ✅ ✅ ✅ ✅ ✅'
+                        echo 'DNS Servers for the platform is ready .✅ ✅ ✅ ✅ ✅ ✅'
                     }
                 }
             }
