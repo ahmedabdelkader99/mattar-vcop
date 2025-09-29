@@ -9,49 +9,26 @@ pipeline {
     parameters {
         string(name: 'PX_ENDPOINT', defaultValue: 'https://10.116.21.71:8006/api2/json', description: 'Proxmox API endpoint')
         string(name: 'PX_NODE', defaultValue: 's1vpsie01', description: 'Target Proxmox node')
-        booleanParam(name: 'PX_TLS', defaultValue: true, description: 'Enable TLS for Proxmox API')
 
-        string(name: 'MASTER_COUNT', defaultValue: '3', description: 'Number of Kubernetes master nodes')
-        string(name: 'MASTER_MEM', defaultValue: '4096', description: 'Memory (MB) for each master node')
-        string(name: 'MASTER_CORES', defaultValue: '2', description: 'CPU cores for each master node')
-
-        string(name: 'WORKER_COUNT', defaultValue: '3', description: 'Number of Kubernetes worker nodes')
-        string(name: 'WORKER_MEM', defaultValue: '4096', description: 'Memory (MB) for each worker node')
-        string(name: 'WORKER_CORES', defaultValue: '2', description: 'CPU cores for each worker node')
         string(name: 'K8S_START_IP', defaultValue: '190', description: 'Starting IP for Kubernetes nodes')
 
-        string(name: 'DB_COUNT', defaultValue: '3', description: 'Number of DB VMs')
-        string(name: 'DB_MEM', defaultValue: '4096', description: 'Memory (MB) for each DB node')
-        string(name: 'DB_CORES', defaultValue: '2', description: 'CPU cores for each DB node')
         string(name: 'DB_START_IP', defaultValue: '201', description: 'Starting IP for DB nodes')
 
-        string(name: 'DNS_COUNT', defaultValue: '3', description: 'Number of DNS VMs')
-        string(name: 'DNS_MEM', defaultValue: '4096', description: 'Memory (MB) for each DNS node')
-        string(name: 'DNS_CORES', defaultValue: '2', description: 'CPU cores for each DNS node')
         string(name: 'DNS_START_IP', defaultValue: '204', description: 'Starting IP for DNS nodes')
 
-        string(name: 'k8sproxy_Mem', defaultValue: '2048', description: 'Memory for K8s Proxy/load balancer')
-        string(name: 'k8sproxy_Cores', defaultValue: '2', description: 'CPU cores for K8s Proxy/load balancer')
         string(name: 'K8S_PROXY_IP', defaultValue: '196', description: 'IP for K8s Proxy/load balancer')
 
-        string(name: 'Haproxy_Mem', defaultValue: '2048', description: 'Memory for HAProxy ')
-        string(name: 'Haproxy_Cores', defaultValue: '2', description: 'CPU cores for HAProxy ')
         string(name: 'PROXY_IP', defaultValue: '198', description: 'IP for HAProxy ')
 
-        string(name: 'k8storageMem', defaultValue: '2048', description: 'Memory for K8s Storage')
-        string(name: 'k8storageCores', defaultValue: '2', description: 'CPU cores for K8s Storage')
-        string(name: 'K8S_STORAGE_IP', defaultValue: '199', description: 'IP for K8s Storage/load balancer')
+        string(name: 'K8S_STORAGE_IP', defaultValue: '200', description: 'IP for K8s Storage/load balancer')
 
         string(name: 'TEMPLATES_SRV_IP', defaultValue: '111', description: 'IP for Templates Server')
-        //string(name: 'sshkeys', defaultValue: 'Your generated ssh key ', description: 'SSH public key for VM access')
+        string(name: 'sshkeys', defaultValue: 'Your generated ssh key ', description: 'SSH public key for VM access')
         string(name: 'ciuser', defaultValue: 'vpsie', description: 'user name for ssh access to VMs')
         string(name: 'CLONE_TEMPLATE', defaultValue: 'ci001', description: 'Base VM/template to clone')
-        string(name: 'Temp_Mem', defaultValue: '2048', description: 'Memory (MB) for the template VM')
-        string(name: 'Temp_Cores', defaultValue: '2', description: 'CPU cores for the template VM')
+
         string(name: 'DEFAULT_STORAGE', defaultValue: 'local', description: 'Proxmox storage location for VM disks')
-        string(name: 'AGENT', defaultValue: '1', description: 'Enable QEMU guest agent (1=enabled, 0=disabled)')
-        string(name: 'OSTYPE', defaultValue: 'cloud-init', description: 'OS type for the VM')
-        string(name: 'SCSI_HW', defaultValue: 'virtio-scsi-pci', description: 'SCSI controller type')
+
         string(name: 'PREFIX', defaultValue: 'test-', description: 'Prefix for VM names')
         string(name: 'DISK_SIZE', defaultValue: '40', description: 'Disk size (GB) per VM')
         string(name: 'SUBNET', defaultValue: 'x.x.x', description: 'Subnet for VMs')
@@ -98,67 +75,42 @@ pipeline {
             }
         }
 
-        stage('Generate tfvars') {
+        stage('Generate terraform.tfvars') {
             steps {
                 script {
-                    def tfvarsContent = """
-px_endpoint      = "${params.PX_ENDPOINT}"
-pxTargetNode     = "${params.PX_NODE}"
-px_tls           = ${params.PX_TLS}
+                    // Update only the parameters inside terraform.tfvars.tmp
+                    sh """
+                    sed -i '/^px_user/d' terraform.tfvars.tmp
+                    sed -i '/^px_password/d' terraform.tfvars.tmp
+                    sed -i "s|^px_endpoint *=.*|px_endpoint    = \\"${params.PX_ENDPOINT}\\"|g" terraform.tfvars.tmp
+                    sed -i "s|^pxTargetNode *=.*|pxTargetNode   = \\"${params.PX_NODE}\\"|g" terraform.tfvars.tmp
+                    sed -i "s|^sshkeys *=.*|sshkeys        = \\"${params.sshkeys}\\"|g" terraform.tfvars.tmp
 
-clone            = "${params.CLONE_TEMPLATE}"
-defaultStorage   = "${params.DEFAULT_STORAGE}"
-agent            = ${params.AGENT}
-osType           = "${params.OSTYPE}"
-scsihw           = "${params.SCSI_HW}"
-prefix           = "${params.PREFIX}"
-diskSize         = ${params.DISK_SIZE}
+                    sed -i "s|^clone *=.*|clone          = \\"${params.CLONE_TEMPLATE}\\"|g" terraform.tfvars.tmp
+                    sed -i "s|^defaultStorage *=.*|defaultStorage = \\"${params.DEFAULT_STORAGE}\\"|g" terraform.tfvars.tmp
 
-subnet           = "${params.SUBNET}"
-gateway          = "${params.GATEWAY}"
-cidr             = 24
-tag              = 1
-k8sStartIP       = ${params.K8S_START_IP}
-dbStartIP        = ${params.DB_START_IP}
-dnsStartIP       = ${params.DNS_START_IP}
-templatesSrvIP   = ${params.TEMPLATES_SRV_IP}
-sshkeys          = "${params.sshkeys}"
-ciuser           = "${params.ciuser}"
+                    sed -i "s|^prefix *=.*|prefix         = \\"${params.PREFIX}\\"|g" terraform.tfvars.tmp
+                    sed -i "s|^diskSize *=.*|diskSize       = ${params.DISK_SIZE}|g" terraform.tfvars.tmp
 
-masterCount      = ${params.MASTER_COUNT}
-masterMem        = ${params.MASTER_MEM}
-masterCores      = ${params.MASTER_CORES}
+                    sed -i "s|^subnet *=.*|subnet         = \\"${params.SUBNET}\\"|g" terraform.tfvars.tmp
+                    sed -i "s|^gateway *=.*|gateway        = \\"${params.GATEWAY}\\"|g" terraform.tfvars.tmp
+                    sed -i "s|^k8sStartIP *=.*|k8sStartIP     = ${params.K8S_START_IP}|g" terraform.tfvars.tmp
+                    sed -i "s|^dbStartIP *=.*|dbStartIP      = ${params.DB_START_IP}|g" terraform.tfvars.tmp
+                    sed -i "s|^dnsStartIP *=.*|dnsStartIP     = ${params.DNS_START_IP}|g" terraform.tfvars.tmp
+                    sed -i "s|^templatesSrvIP *=.*|templatesSrvIP = ${params.TEMPLATES_SRV_IP}|g" terraform.tfvars.tmp
+                    sed -i "s|^ciuser *=.*|ciuser         = \\"${params.ciuser}\\"|g" terraform.tfvars.tmp
 
-workersCount     = ${params.WORKER_COUNT}
-workerMem        = ${params.WORKER_MEM}
-workerCores      = ${params.WORKER_CORES}
+                    sed -i "s|^k8sProxyIP *=.*|k8sProxyIP     = ${params.K8S_PROXY_IP}|g" terraform.tfvars.tmp
 
-dbCount          = ${params.DB_COUNT}
-dbMem            = ${params.DB_MEM}
-dbCores          = ${params.DB_CORES}
+                    sed -i "s|^k8sStorageIP *=.*|k8sStorageIP   = ${params.K8S_STORAGE_IP}|g" terraform.tfvars.tmp
 
-dnsCount         = ${params.DNS_COUNT}
-dnsMem           = ${params.DNS_MEM}
-dnsCores         = ${params.DNS_CORES}
+                    sed -i "s|^proxyIP *=.*|proxyIP        = ${params.PROXY_IP}|g" terraform.tfvars.tmp
+                    sed -i "s|^apiKey *=.*| apikey         = \\"${params.apikey}\\"|g" terraform.tfvars.tmp
 
-k8sproxyMem      = ${params.k8sproxy_Mem}
-k8sproxyCores    = ${params.k8sproxy_Cores}
-k8sProxyIP       = ${params.K8S_PROXY_IP}
+                    """
 
-k8storageMem     = ${params.k8storage_Mem}
-k8storageCores   = ${params.k8storage_Cores}
-k8sStorageIP     = ${params.K8S_STORAGE_IP}
-
-haproxyMem       = ${params.Haproxy_Mem}
-haproxyCores     = ${params.Haproxy_Cores}
-proxyIP          = ${params.PROXY_IP}
-
-tempMem          = ${params.Temp_Mem}
-tempCores        = ${params.Temp_Cores}
-apikey           = "${params.apikey}"
-
-"""
-                    writeFile file: 'terraform.tfvars', text: tfvarsContent
+                    // Save the final version
+                    sh 'cp terraform.tfvars.tmp terraform.tfvars'
                     sh "echo '✅ Generated terraform.tfvars:' && cat terraform.tfvars"
                 }
             }
@@ -212,103 +164,55 @@ apikey           = "${params.apikey}"
         stage('Check VM Availability') {
             steps {
                 script {
-                    def vmIPs = []
+                    def privateKey = '/var/jenkins_home/.ssh/id_rsa'
+                    def hostsFile = 'hosts'
+                    def maxRetries = 3         // number of attempts
+                    def waitSeconds = 60       // wait time between retries
 
-                    // ✅ Generate SSH key once outside the loop
-                    sh '''
-                        echo "🧹 Cleaning old SSH keys..."
-                        rm -f /var/jenkins_home/.ssh/id_rsa /var/jenkins_home/.ssh/id_rsa.pub
+                    def vmIPs = readFile(hostsFile).split('\n').findAll { it?.trim() }
 
-                        echo "🔑 Generating SSH keypair once for this pipeline run..."
-                        ssh-keygen -t rsa -b 4096 -f /var/jenkins_home/.ssh/id_rsa -N "" -q
-                        chmod 600 /var/jenkins_home/.ssh/id_rsa
-                    '''
-
-                    // DB VMs
-                    for (int i = 0; i < params.DB_COUNT.toInteger(); i++) {
-                        vmIPs.add("${params.SUBNET}.${params.DB_START_IP.toInteger() + i}")
-                    }
-
-                    // K8s master nodes
-                    for (int i = 0; i < params.MASTER_COUNT.toInteger(); i++) {
-                        vmIPs.add("${params.SUBNET}.${params.K8S_START_IP.toInteger() + i}")
-                    }
-
-                    // K8s worker nodes
-                    for (int i = 0; i < params.WORKER_COUNT.toInteger(); i++) {
-                        vmIPs.add("${params.SUBNET}.${params.K8S_START_IP.toInteger() + params.MASTER_COUNT.toInteger() + i}")
-                    }
-
-                    // DNS nodes
-                    for (int i = 0; i < params.DNS_COUNT.toInteger(); i++) {
-                        vmIPs.add("${params.SUBNET}.${params.DNS_START_IP.toInteger() + i}")
-                    }
-
-                    // Proxy, Templates, Backup
-                    vmIPs.add("${params.SUBNET}.${params.PROXY_IP.toInteger()}")
-                    vmIPs.add("${params.SUBNET}.${params.TEMPLATES_SRV_IP.toInteger()}")
-                    vmIPs.add("${params.SUBNET}.${params.K8S_STORAGE_IP.toInteger()}")
-                    vmIPs.add("${params.SUBNET}.${params.K8S_PROXY_IP.toInteger()}")
-
-                    def unreachableVMs = []
-
-                    // Check ping and copy SSH key
                     vmIPs.each { ip ->
-                        int retries = 3
+                        echo "🔹 Checking VM ${ip} ..."
                         boolean reachable = false
 
-                        for (int attempt = 1; attempt <= retries; attempt++) {
-                            def pingResult = sh(script: "ping -c 5 ${ip}", returnStatus: true)
-                            if (pingResult == 0) {
+                        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                            echo "Attempt ${attempt} to ping ${ip} ..."
+                            def pingStatus = sh(script: "ping -c 3 ${ip}", returnStatus: true)
+
+                            if (pingStatus == 0) {
+                                echo "✅ ${ip} is reachable via ping"
                                 reachable = true
-                                echo "✅ VM ${ip} is reachable."
-                                break
-                            } else {
-                                echo "⚠️ Attempt ${attempt} - VM ${ip} is not reachable yet ..."
-                                sleep 90
+
+                                // Optional: check SSH key login
+                                def sshStatus = sh(script: "ssh -i ${privateKey} -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@${ip} 'echo SSH OK'", returnStatus: true)
+                                if (sshStatus == 0) {
+                                    echo "✅ SSH key works for ${ip}"
+                        } else {
+                                    echo "⚠️ SSH key login failed for ${ip}"
+                                }
+
+                                break  // exit retry loop if ping successful
+                    } else {
+                                echo "⚠️ ${ip} is not reachable on attempt ${attempt}"
+                                if (attempt < maxRetries) {
+                                    echo "⏳ Waiting ${waitSeconds} seconds before retry..."
+                                    sleep(waitSeconds)
+                                }
                             }
                         }
 
                         if (!reachable) {
-                            echo "❌ VM ${ip} is not reachable after ${retries} attempts."
-                            unreachableVMs.add(ip)
-                        } else {
-                            echo '--------------SSHKEY--------------------------'
-                              // ✅ Reuse the already-generated key for all VMs
-
-                            sh """
-                                ssh-keygen -R ${ip} || true
-                                echo "📤 Copying public key to ${ip} ..."
-                                sshpass -p '${params.VM_VCOP_PASSWORD}' ssh-copy-id -f -i /var/jenkins_home/.ssh/id_rsa.pub -o StrictHostKeyChecking=no root@${ip}
-
-                                sshpass -p '${params.VM_VCOP_PASSWORD}' ssh -o StrictHostKeyChecking=no root@${ip} '''
-                                    # Update sshd_config to allow root login and public key authentication
-                                    sed -i "s/^#\\?PermitRootLogin.*/PermitRootLogin yes/" /etc/ssh/sshd_config
-                                    sed -i "s/^#\\?PubkeyAuthentication.*/PubkeyAuthentication yes/" /etc/ssh/sshd_config
-
-                                    # Ensure AuthorizedKeysFile is set
-                                    grep -q "^AuthorizedKeysFile" /etc/ssh/sshd_config || echo "AuthorizedKeysFile .ssh/authorized_keys" >> /etc/ssh/sshd_config
-
-                                    # Restart SSH service
-                                    systemctl restart sshd
-                                '''
-
-                                echo "✅ SSH key copied to ${ip}."
-                                echo "-------------------------#########################---------------"
-                                echo "Your SSH private key (keep it secret!):"
-                                cat /var/jenkins_home/.ssh/id_rsa
-                                echo "--------------------###############################--------------------"
-                            """
+                            echo "❌ ${ip} is not reachable after ${maxRetries} attempts"
                         }
-                    }
 
-                    // Fail pipeline if any VMs are unreachable
-                    if (unreachableVMs.size() > 0) {
-                        error "The following VMs are unreachable: ${unreachableVMs.join(', ')}"
+                        echo '------------------------------------'
                     }
                 }
             }
         }
+
+        ############ from here we start ############
+
         stage('Deploy the K8s Cluster') {
             steps {
                 script {

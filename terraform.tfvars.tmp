@@ -54,11 +54,16 @@ k8storageCores = 2                                       # CPU cores for Kuberne
 ## Database configuration
 dbMem          = "2048"                                  # Memory in MB for database VM
 dbCores        = "2"                                     # CPU cores for database VM
-
+dbCount        = "3"
 
 ## DNS configuration
 dnsMem         = 2048                                    # Memory in MB for DNS server
 dnsCores       = 2                                       # CPU cores for DNS server
+dnsCount       = 3 
+
+##temp
+tempMem        = 2048
+tempCores      = 2
 
 
 ## HAProxy configuration
