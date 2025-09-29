@@ -412,6 +412,64 @@ apikey           = "${params.apikey}"
                 }
             }
         }
+        stage('Configure NFS-Shared-Storage') {
+            steps {
+                dir('NFS-shared-storage-setup') {
+                    script {
+                        sh """
+                        echo '🔑 Logging into NFS server VM and configuring NFS...'
+                        ssh -o StrictHostKeyChecking=no root@${params.SUBNET}.${params.K8S_STORAGE_IP} "
+                            echo '📁 Creating shared directory...' &&
+                            mkdir -p /mnt/vpsie1 &&
+
+                            echo '📂 Changing directory ownership...' &&
+                            chown nobody:nogroup /mnt/vpsie1 &&
+
+                            echo '📥 Installing NFS server packages...' &&
+                            apt-get update -y && apt-get install -y nfs-kernel-server &&
+                            echo '✅ NFS server packages installed.' &&
+
+                            echo '🔎 Checking if NFS service is running...' &&
+                            if systemctl is-active --quiet nfs-kernel-server; then
+                                echo '✅ NFS service is already running.'
+                            else
+                                echo '⚙️ Starting NFS service...' &&
+                                systemctl start nfs-kernel-server &&
+                                systemctl enable nfs-kernel-server &&
+                                echo '✅ NFS service started and enabled.'
+                            fi &&
+
+                            echo '⚙️ Configuring NFS exports...' &&
+                            LINE='/mnt/vpsie1 ${params.SUBNET}.0/24(rw,sync,no_subtree_check,no_root_squash)'
+                            if ! grep -qxF \"\$LINE\" /etc/exports; then
+                                echo \"\$LINE\" >> /etc/exports
+                                echo '✅ Added new export entry.'
+                            else
+                                echo 'ℹ️ Export entry already exists, skipping...'
+                            fi &&
+
+                            echo '################ /etc/exports ################' &&
+                            cat /etc/exports &&
+                            echo '##############################################' &&
+
+                            echo '🔄 Reloading NFS exports...' &&
+                            exportfs -a &&
+                            echo '✅ NFS exports configured and reloaded.' &&
+
+                            echo '🔎 Verifying NFS service after reload...' &&
+                            if systemctl is-active --quiet nfs-kernel-server; then
+                                echo '✅ NFS service is active and running.'
+                            else
+                                echo '❌ NFS service is NOT running!'
+                                systemctl status nfs-kernel-server
+                                exit 1
+                            fi
+                        "
+                    """
+                    }
+                }
+            }
+        }
 
         stage('Build a Database Cluster for the platform.') {
             steps {
@@ -570,6 +628,11 @@ ${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
 
                         echo '⚙️ Running DNS Ansible playbook...'
                         sh "ansible-playbook -i hosts play-pdns.yml -e apikey=${params.apikey}"
+                        if (currentBuild.result == 'FAILURE') {
+                            error '❌ DNS Ansible playbook failed. Check the logs above for details.'
+                        } else {
+                            echo '✅ DNS Ansible playbook completed successfully.'
+                        }
                         echo '🛠️ Waiting for DNS service on port 8081...'
                         sleep 90
                         sh """
@@ -578,7 +641,7 @@ ${params.DNS_HOST3_NAME} ansible_host=${params.DNS_HOST3_IP} ansible_port=22
                         echo "✅ DNS service check completed on ${params.DNS_HOST3_IP} with status code = \$status"
                         '
                         """
-                        echo 'Build and Configure DNS Servers for the platform.✅ ✅ ✅ ✅ ✅ ✅'
+                        echo 'DNS Servers for the platform is ready .✅ ✅ ✅ ✅ ✅ ✅'
                     }
                 }
             }
