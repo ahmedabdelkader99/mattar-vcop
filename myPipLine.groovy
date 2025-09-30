@@ -34,23 +34,23 @@ pipeline {
                     ssh-keygen -t rsa -b 2048 -f /var/jenkins_home/.ssh/id_rsa -q -N ""
                     echo "✅ SSH key pair generated."
                     echo "Public Key:"
-                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    echo "#################################"
                     cat /var/jenkins_home/.ssh/id_rsa.pub
-                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    echo "#################################"
                     echo "Private Key:"
-                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    echo "#################################"
                     cat /var/jenkins_home/.ssh/id_rsa
-                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    echo "#################################"
                 else
                     echo "ℹ️ SSH key pair already exists, skipping generation."
                     echo "Public Key:"
-                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    echo "#################################"
                     cat /var/jenkins_home/.ssh/id_rsa.pub
-                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    echo "#################################"
                     echo "Private Key:"
-                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    echo "#################################"
                     cat /var/jenkins_home/.ssh/id_rsa
-                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    echo "#################################"
                 fi
                 '''
             }
@@ -98,6 +98,10 @@ pipeline {
                     sed -i "s|^ciuser *=.*|ciuser         = \\"${params.ciuser}\\"|g" terraform.tfvars.tmp
                     sed -i "s|^apiKey *=.*| apikey         = \\"${params.apikey}\\"|g" terraform.tfvars.tmp
                     """
+                    sh '''
+                    PUBKEY=$(cat /var/jenkins_home/.ssh/id_rsa.pub)
+                    sed -i "s|^sshkeys *=.*|sshkeys        = [\\\"$PUBKEY\\\"]|g" terraform.tfvars.tmp
+                    '''
 
                     // Save the final version
                     sh 'cp terraform.tfvars.tmp terraform.tfvars'
