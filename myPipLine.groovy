@@ -9,44 +9,15 @@ pipeline {
     parameters {
         string(name: 'PX_ENDPOINT', defaultValue: 'https://10.116.21.71:8006/api2/json', description: 'Proxmox API endpoint')
         string(name: 'PX_NODE', defaultValue: 's1vpsie01', description: 'Target Proxmox node')
-
-        string(name: 'K8S_START_IP', defaultValue: '190', description: 'Starting IP for Kubernetes nodes')
-
-        string(name: 'DB_START_IP', defaultValue: '201', description: 'Starting IP for DB nodes')
-
-        string(name: 'DNS_START_IP', defaultValue: '204', description: 'Starting IP for DNS nodes')
-
-        string(name: 'K8S_PROXY_IP', defaultValue: '196', description: 'IP for K8s Proxy/load balancer')
-
-        string(name: 'PROXY_IP', defaultValue: '198', description: 'IP for HAProxy ')
-
-        string(name: 'K8S_STORAGE_IP', defaultValue: '200', description: 'IP for K8s Storage/load balancer')
-
         string(name: 'TEMPLATES_SRV_IP', defaultValue: '111', description: 'IP for Templates Server')
-        string(name: 'sshkeys', defaultValue: 'Your generated ssh key ', description: 'SSH public key for VM access')
         string(name: 'ciuser', defaultValue: 'vpsie', description: 'user name for ssh access to VMs')
         string(name: 'CLONE_TEMPLATE', defaultValue: 'ci001', description: 'Base VM/template to clone')
-
         string(name: 'DEFAULT_STORAGE', defaultValue: 'local', description: 'Proxmox storage location for VM disks')
-
         string(name: 'PREFIX', defaultValue: 'test-', description: 'Prefix for VM names')
         string(name: 'DISK_SIZE', defaultValue: '40', description: 'Disk size (GB) per VM')
-        string(name: 'SUBNET', defaultValue: 'x.x.x', description: 'Subnet for VMs')
-        string(name: 'GATEWAY', defaultValue: 'x.x.x.x', description: 'Gateway IP for the subnet')
-        string(name: 'VM_VCOP_PASSWORD', defaultValue: 'Your-Vcop-Password', description: 'Password for all VMs')
-        string(name: 'DB_HOST1_NAME', defaultValue: 'k8s-database01', description: 'DB node 1 hostname')
-        string(name: 'DB_HOST1_IP', defaultValue: '10.x.x.201', description: 'DB node 1 IP address')
-        string(name: 'DB_HOST2_NAME', defaultValue: 'k8s-database02', description: 'DB node 2 hostname')
-        string(name: 'DB_HOST2_IP', defaultValue: '10.x.x.202', description: 'DB node 2 IP address')
-        string(name: 'DB_HOST3_NAME', defaultValue: 'k8s-database03', description: 'DB node 3 hostname')
-        string(name: 'DB_HOST3_IP', defaultValue: '10.x.x.203', description: 'DB node 3 IP address')
-        string(name: 'DNS_HOST1_NAME', defaultValue: 'dns01', description: 'DNS node 1 hostname')
-        string(name: 'DNS_HOST1_IP', defaultValue: '10.x.x.204', description: 'DNS node 1 IP address')
-        string(name: 'DNS_HOST2_NAME', defaultValue: 'dns02', description: 'DNS node 2 hostname')
-        string(name: 'DNS_HOST2_IP', defaultValue: '10.x.x.205', description: 'DNS node 2 IP address')
-        string(name: 'DNS_HOST3_NAME', defaultValue: 'dns03', description: 'DNS node 3 hostname')
-        string(name: 'DNS_HOST3_IP', defaultValue: '10.x.x.206', description: 'DNS node 3 IP address')
-        string(name: 'apikey', defaultValue: 'generate your API key using API Key Generator', description: 'API key for the setup')
+        string(name: 'SUBNET', defaultValue: '10.x.x', description: 'Subnet for VMs')
+        string(name: 'GATEWAY', defaultValue: '10.x.x.x', description: 'Gateway IP for the subnet')
+        string(name: 'apikey', defaultValue: 'Generate your API key using API Key Generator ', description: 'https://codepen.io/corenominal/pen/rxOmMJ')
     }
 
     stages {
@@ -55,20 +26,53 @@ pipeline {
                 git branch: 'main', url: 'https://github.com/ahmedabdelkader99/mattar-vcop'
             }
         }
+        stage('Genrate sshkey-pairs inside jenkins vm') {
+            steps {
+                sh '''
+                if [ ! -f /var/jenkins_home/.ssh/id_rsa ]; then
+                    echo "🔐 Generating SSH key pair..."
+                    ssh-keygen -t rsa -b 2048 -f /var/jenkins_home/.ssh/id_rsa -q -N ""
+                    echo "✅ SSH key pair generated."
+                    echo "Public Key:"
+                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    cat /var/jenkins_home/.ssh/id_rsa.pub
+                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    echo "Private Key:"
+                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    cat /var/jenkins_home/.ssh/id_rsa
+                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                else
+                    echo "ℹ️ SSH key pair already exists, skipping generation."
+                    echo "Public Key:"
+                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    cat /var/jenkins_home/.ssh/id_rsa.pub
+                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    echo "Private Key:"
+                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                    cat /var/jenkins_home/.ssh/id_rsa
+                    echo "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+                fi
+                '''
+            }
+        }
 
         stage('Check Proxmox Login') {
             steps {
                 sh '''
                     echo "🔑 Checking Proxmox login for user: $TF_VAR_px_user"
+
+                    # Perform login and capture response
                     LOGIN_RESPONSE=$(curl -sk \
                         -d "username=$TF_VAR_px_user&password=$TF_VAR_px_password" \
-                        "$PX_ENDPOINT" || true)
+                        "$PX_ENDPOINT")
 
-                    if echo "$LOGIN_RESPONSE"; then
+                    # Check if login returned a valid ticket
+                    if echo "$LOGIN_RESPONSE" | jq -e '.data.ticket' >/dev/null; then
                         echo "✅ Login succeeded to Proxmox API $PX_ENDPOINT"
                     else
-                        echo "❌ Login FAILED to Proxmox API"
-                        echo "Response: $LOGIN_RESPONSE"
+                        echo "❌ Login FAILED to Proxmox API $PX_ENDPOINT"
+                        echo "Response from server:"
+                        echo "$LOGIN_RESPONSE"
                         exit 1
                     fi
                 '''
@@ -84,29 +88,15 @@ pipeline {
                     sed -i '/^px_password/d' terraform.tfvars.tmp
                     sed -i "s|^px_endpoint *=.*|px_endpoint    = \\"${params.PX_ENDPOINT}\\"|g" terraform.tfvars.tmp
                     sed -i "s|^pxTargetNode *=.*|pxTargetNode   = \\"${params.PX_NODE}\\"|g" terraform.tfvars.tmp
-                    sed -i "s|^sshkeys *=.*|sshkeys        = \\"${params.sshkeys}\\"|g" terraform.tfvars.tmp
-
                     sed -i "s|^clone *=.*|clone          = \\"${params.CLONE_TEMPLATE}\\"|g" terraform.tfvars.tmp
                     sed -i "s|^defaultStorage *=.*|defaultStorage = \\"${params.DEFAULT_STORAGE}\\"|g" terraform.tfvars.tmp
-
                     sed -i "s|^prefix *=.*|prefix         = \\"${params.PREFIX}\\"|g" terraform.tfvars.tmp
                     sed -i "s|^diskSize *=.*|diskSize       = ${params.DISK_SIZE}|g" terraform.tfvars.tmp
-
                     sed -i "s|^subnet *=.*|subnet         = \\"${params.SUBNET}\\"|g" terraform.tfvars.tmp
                     sed -i "s|^gateway *=.*|gateway        = \\"${params.GATEWAY}\\"|g" terraform.tfvars.tmp
-                    sed -i "s|^k8sStartIP *=.*|k8sStartIP     = ${params.K8S_START_IP}|g" terraform.tfvars.tmp
-                    sed -i "s|^dbStartIP *=.*|dbStartIP      = ${params.DB_START_IP}|g" terraform.tfvars.tmp
-                    sed -i "s|^dnsStartIP *=.*|dnsStartIP     = ${params.DNS_START_IP}|g" terraform.tfvars.tmp
                     sed -i "s|^templatesSrvIP *=.*|templatesSrvIP = ${params.TEMPLATES_SRV_IP}|g" terraform.tfvars.tmp
                     sed -i "s|^ciuser *=.*|ciuser         = \\"${params.ciuser}\\"|g" terraform.tfvars.tmp
-
-                    sed -i "s|^k8sProxyIP *=.*|k8sProxyIP     = ${params.K8S_PROXY_IP}|g" terraform.tfvars.tmp
-
-                    sed -i "s|^k8sStorageIP *=.*|k8sStorageIP   = ${params.K8S_STORAGE_IP}|g" terraform.tfvars.tmp
-
-                    sed -i "s|^proxyIP *=.*|proxyIP        = ${params.PROXY_IP}|g" terraform.tfvars.tmp
                     sed -i "s|^apiKey *=.*| apikey         = \\"${params.apikey}\\"|g" terraform.tfvars.tmp
-
                     """
 
                     // Save the final version
@@ -184,7 +174,7 @@ pipeline {
                                 reachable = true
 
                                 // Optional: check SSH key login
-                                def sshStatus = sh(script: "ssh -i ${privateKey} -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@${ip} 'echo SSH OK'", returnStatus: true)
+                                def sshStatus = sh(script: "ssh -i ${privateKey} -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no ${params.ciuser}@${ip} 'echo SSH OK'", returnStatus: true)
                                 if (sshStatus == 0) {
                                     echo "✅ SSH key works for ${ip}"
                         } else {
@@ -210,8 +200,6 @@ pipeline {
                 }
             }
         }
-
-        ############ from here we start ############
 
         stage('Deploy the K8s Cluster') {
             steps {
