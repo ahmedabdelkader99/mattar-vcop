@@ -629,33 +629,26 @@ pipeline {
                     def dbFolder_dumps = "${env.WORKSPACE}/db"
                     sh "mkdir -p ${dbFolder_dumps}"
 
-                    // Handle MySQL dump (file parameter name: DB_FILE)
-                    if (params.DB_FILE?.trim()) {
-                        def mysqlFile = "${env.WORKSPACE}/${params.DB_FILE}"
-                        if (fileExists(mysqlFile)) {
-                            sh "mv '${mysqlFile}' '${dbFolder_dumps}/DB_FILE.sql'"
+                    // MySQL dump
+                    withFileParameter(name: 'DB_FILE', allowNoFile: true) { uploadedMySQLFile ->
+                        if (uploadedMySQLFile && fileExists(uploadedMySQLFile)) {
+                            sh "mv ${uploadedMySQLFile} ${dbFolder_dumps}/DB_FILE.sql"
                             echo "✅ MySQL dump moved to ${dbFolder_dumps}/DB_FILE.sql"
                         } else {
-                            echo "⚠️ MySQL dump file '${params.DB_FILE}' not found in workspace."
+                            echo 'ℹ️ No MySQL dump file provided. Skipping.'
                         }
-                    } else {
-                        echo 'ℹ️ No MySQL dump file provided. Skipping.'
                     }
 
-                    // Handle MongoDB dump (file parameter name: MONGO_DB_FILE)
-                    if (params.MONGO_DB_FILE?.trim()) {
-                        def mongoFile = "${env.WORKSPACE}/${params.MONGO_DB_FILE}"
-                        if (fileExists(mongoFile)) {
-                            sh "mv '${mongoFile}' '${dbFolder_dumps}/vpsie-file.archive'"
+                    // MongoDB dump
+                    withFileParameter(name: 'MONGO_DB_FILE', allowNoFile: true) { uploadedMongoFile ->
+                        if (uploadedMongoFile && fileExists(uploadedMongoFile)) {
+                            sh "mv ${uploadedMongoFile} ${dbFolder_dumps}/vpsie-file.archive"
                             echo "✅ MongoDB dump moved to ${dbFolder_dumps}/vpsie-file.archive"
                         } else {
-                            echo "⚠️ MongoDB dump file '${params.MONGO_DB_FILE}' not found in workspace."
+                            echo 'ℹ️ No MongoDB dump file provided. Skipping.'
                         }
-                    } else {
-                        echo 'ℹ️ No MongoDB dump file provided. Skipping.'
                     }
 
-                    // Show resulting files
                     sh "ls -lh ${dbFolder_dumps}"
                 }
             }
@@ -935,5 +928,5 @@ pipeline {
                 }
             }
         }
+        }
     }
-}
