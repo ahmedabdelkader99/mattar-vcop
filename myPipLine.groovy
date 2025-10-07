@@ -18,7 +18,7 @@ pipeline {
         string(name: 'SUBNET', defaultValue: '10.x.x', description: 'Subnet for VMs')
         string(name: 'GATEWAY', defaultValue: '10.x.x.x', description: 'Gateway IP for the subnet')
         string(name: 'apikey', defaultValue: 'Generate your API key using API Key Generator ', description: 'https://codepen.io/corenominal/pen/rxOmMJ')
-        string(name: 'DB_PASSWORD', defaultValue: 'DB_Password', description: 'Root password for the database cluster')
+        password(name: 'DB_PASSWORD', defaultValue: '', description: 'Root password for the database cluster')
         string(name: 'DB_USERNAME', defaultValue: 'DB_userName', description: 'username for the database cluster')
         file(name: 'DB_FILE', description: 'Upload your DB Dump file')
         file(name: 'MONGO_DB_FILE', description: 'Upload your Mongo_DB Dump file')
@@ -629,26 +629,33 @@ pipeline {
                     def dbFolder_dumps = "${env.WORKSPACE}/db"
                     sh "mkdir -p ${dbFolder_dumps}"
 
-                    // MySQL dump
-                    withFileParameter(name: 'DB_FILE', allowNoFile: true) { uploadedMySQLFile ->
-                        if (uploadedMySQLFile && fileExists(uploadedMySQLFile)) {
-                            sh "mv ${uploadedMySQLFile} ${dbFolder_dumps}/DB_FILE.sql"
+                    // Handle MySQL dump (file parameter name: DB_FILE)
+                    if (params.DB_FILE?.trim()) {
+                        def mysqlFile = "${env.WORKSPACE}/${params.DB_FILE}"
+                        if (fileExists(mysqlFile)) {
+                            sh "mv '${mysqlFile}' '${dbFolder_dumps}/DB_FILE.sql'"
                             echo "✅ MySQL dump moved to ${dbFolder_dumps}/DB_FILE.sql"
                         } else {
-                            echo 'ℹ️ No MySQL dump file provided. Skipping.'
+                            echo "⚠️ MySQL dump file '${params.DB_FILE}' not found in workspace."
                         }
+                    } else {
+                        echo 'ℹ️ No MySQL dump file provided. Skipping.'
                     }
 
-                    // MongoDB dump
-                    withFileParameter(name: 'MONGO_DB_FILE', allowNoFile: true) { uploadedMongoFile ->
-                        if (uploadedMongoFile && fileExists(uploadedMongoFile)) {
-                            sh "mv ${uploadedMongoFile} ${dbFolder_dumps}/vpsie-file.archive"
+                    // Handle MongoDB dump (file parameter name: MONGO_DB_FILE)
+                    if (params.MONGO_DB_FILE?.trim()) {
+                        def mongoFile = "${env.WORKSPACE}/${params.MONGO_DB_FILE}"
+                        if (fileExists(mongoFile)) {
+                            sh "mv '${mongoFile}' '${dbFolder_dumps}/vpsie-file.archive'"
                             echo "✅ MongoDB dump moved to ${dbFolder_dumps}/vpsie-file.archive"
                         } else {
-                            echo 'ℹ️ No MongoDB dump file provided. Skipping.'
+                            echo "⚠️ MongoDB dump file '${params.MONGO_DB_FILE}' not found in workspace."
                         }
+                    } else {
+                        echo 'ℹ️ No MongoDB dump file provided. Skipping.'
                     }
 
+                    // Show resulting files
                     sh "ls -lh ${dbFolder_dumps}"
                 }
             }
@@ -928,5 +935,5 @@ pipeline {
                 }
             }
         }
-        }
     }
+}
