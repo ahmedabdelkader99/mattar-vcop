@@ -20,8 +20,8 @@ pipeline {
         string(name: 'apikey', defaultValue: 'Generate your API key using API Key Generator ', description: 'https://codepen.io/corenominal/pen/rxOmMJ')
         password(name: 'DB_PASSWORD', defaultValue: '', description: 'Root password for the database cluster')
         string(name: 'DB_USERNAME', defaultValue: 'DB_userName', description: 'username for the database cluster')
-        file(name: 'DB_FILE', description: 'Upload your DB Dump file')
-        file(name: 'MONGO_DB_FILE', description: 'Upload your Mongo_DB Dump file')
+        // file(name: 'DB_FILE', description: 'Upload your DB Dump file')
+        // file(name: 'MONGO_DB_FILE', description: 'Upload your Mongo_DB Dump file')
     }
 
     stages {
@@ -622,105 +622,105 @@ pipeline {
                 }
             }
         }
-        stage('Prepare DB Dumps') {
-            steps {
-                script {
-                    // Create folder for DB dumps
-                    def dbFolder_dumps = "${env.WORKSPACE}/db"
-                    sh "mkdir -p ${dbFolder_dumps}"
+        // stage('Prepare DB Dumps') {
+        //     steps {
+        //         script {
+        //             // Create folder for DB dumps
+        //             def dbFolder_dumps = "${env.WORKSPACE}/db"
+        //             sh "mkdir -p ${dbFolder_dumps}"
 
-                    // MySQL dump
-                    withFileParameter(name: 'DB_FILE', allowNoFile: true) { uploadedMySQLFile ->
-                        if (uploadedMySQLFile && fileExists(uploadedMySQLFile)) {
-                            sh "mv ${uploadedMySQLFile} ${dbFolder_dumps}/DB_FILE.sql"
-                            echo "✅ MySQL dump moved to ${dbFolder_dumps}/DB_FILE.sql"
-                        } else {
-                            echo 'ℹ️ No MySQL dump file provided. Skipping.'
-                        }
-                    }
+        //             // MySQL dump
+        //             withFileParameter(name: 'DB_FILE', allowNoFile: true) { uploadedMySQLFile ->
+        //                 if (uploadedMySQLFile && fileExists(uploadedMySQLFile)) {
+        //                     sh "mv ${uploadedMySQLFile} ${dbFolder_dumps}/DB_FILE.sql"
+        //                     echo "✅ MySQL dump moved to ${dbFolder_dumps}/DB_FILE.sql"
+        //                 } else {
+        //                     echo 'ℹ️ No MySQL dump file provided. Skipping.'
+        //                 }
+        //             }
 
-                    // MongoDB dump
-                    withFileParameter(name: 'MONGO_DB_FILE', allowNoFile: true) { uploadedMongoFile ->
-                        if (uploadedMongoFile && fileExists(uploadedMongoFile)) {
-                            sh "mv ${uploadedMongoFile} ${dbFolder_dumps}/vpsie-file.archive"
-                            echo "✅ MongoDB dump moved to ${dbFolder_dumps}/vpsie-file.archive"
-                        } else {
-                            echo 'ℹ️ No MongoDB dump file provided. Skipping.'
-                        }
-                    }
+        //             // MongoDB dump
+        //             withFileParameter(name: 'MONGO_DB_FILE', allowNoFile: true) { uploadedMongoFile ->
+        //                 if (uploadedMongoFile && fileExists(uploadedMongoFile)) {
+        //                     sh "mv ${uploadedMongoFile} ${dbFolder_dumps}/vpsie-file.archive"
+        //                     echo "✅ MongoDB dump moved to ${dbFolder_dumps}/vpsie-file.archive"
+        //                 } else {
+        //                     echo 'ℹ️ No MongoDB dump file provided. Skipping.'
+        //                 }
+        //             }
 
-                    sh "ls -lh ${dbFolder_dumps}"
-                }
-            }
-        }
+        //             sh "ls -lh ${dbFolder_dumps}"
+        //         }
+        //     }
+        // }
 
-        stage('Restoring default DBs (MySQL, MongoDB)') {
-            steps {
-                script {
-                    // Read DB host(s) from Terraform output
-                    def dbHosts = readJSON file: 'terraform_output.json'
-                    def DB_HOST1 = dbHosts.database.value[0]
+        // stage('Restoring default DBs (MySQL, MongoDB)') {
+        //     steps {
+        //         script {
+        //             // Read DB host(s) from Terraform output
+        //             def dbHosts = readJSON file: 'terraform_output.json'
+        //             def DB_HOST1 = dbHosts.database.value[0]
 
-                    // --- MySQL Restore ---
-                    withFileParameter(name: 'DB_FILE', allowNoFile: true) { uploadedMySQLFile ->
-                        if (uploadedMySQLFile && fileExists(uploadedMySQLFile)) {
-                            def dbFileName = uploadedMySQLFile.tokenize('/').last()
-                            echo "📦 Found MySQL dump file: ${uploadedMySQLFile}"
+        //             // --- MySQL Restore ---
+        //             withFileParameter(name: 'DB_FILE', allowNoFile: true) { uploadedMySQLFile ->
+        //                 if (uploadedMySQLFile && fileExists(uploadedMySQLFile)) {
+        //                     def dbFileName = uploadedMySQLFile.tokenize('/').last()
+        //                     echo "📦 Found MySQL dump file: ${uploadedMySQLFile}"
 
-                            echo '📤 Uploading MySQL dump to DB Host1...'
-                            sh """
-                                scp -o StrictHostKeyChecking=no ${uploadedMySQLFile} ${params.ciuser}@${DB_HOST1}:/home/${params.ciuser}/
-                                ls -lh ${uploadedMySQLFile}
-                            """
+        //                     echo '📤 Uploading MySQL dump to DB Host1...'
+        //                     sh """
+        //                         scp -o StrictHostKeyChecking=no ${uploadedMySQLFile} ${params.ciuser}@${DB_HOST1}:/home/${params.ciuser}/
+        //                         ls -lh ${uploadedMySQLFile}
+        //                     """
 
-                            echo '⏳ Waiting 15 seconds to ensure file is fully uploaded...'
-                            sleep time: 15, unit: 'SECONDS'
+        //                     echo '⏳ Waiting 15 seconds to ensure file is fully uploaded...'
+        //                     sleep time: 15, unit: 'SECONDS'
 
-                            echo '📥 Creating database vpsie if it does not exist...'
-                            sh """
-                                ssh -o StrictHostKeyChecking=no ${params.ciuser}@${DB_HOST1} \\
-                                "sudo mysql -e \\"CREATE DATABASE IF NOT EXISTS vpsie;\\""
-                            """
+        //                     echo '📥 Creating database vpsie if it does not exist...'
+        //                     sh """
+        //                         ssh -o StrictHostKeyChecking=no ${params.ciuser}@${DB_HOST1} \\
+        //                         "sudo mysql -e \\"CREATE DATABASE IF NOT EXISTS vpsie;\\""
+        //                     """
 
-                            echo '📥 Restoring MySQL dump on DB Host1...'
-                            sh """
-                                ssh -o StrictHostKeyChecking=no ${params.ciuser}@${DB_HOST1} \\
-                                "mysql -u ${params.DB_USERNAME.split(',')[0] ?: params.DB_USERNAME} -p'${params.DB_PASSWORD.split(',')[0] ?: params.DB_PASSWORD}' vpsie < /home/${params.ciuser}/${dbFileName}"
-                            """
-                            echo "✅ MySQL dump file ${dbFileName} restored successfully."
-                        } else {
-                            echo 'ℹ️ No MySQL dump file provided or file not found. Skipping restore step.'
-                        }
-                    }
+        //                     echo '📥 Restoring MySQL dump on DB Host1...'
+        //                     sh """
+        //                         ssh -o StrictHostKeyChecking=no ${params.ciuser}@${DB_HOST1} \\
+        //                         "mysql -u ${params.DB_USERNAME.split(',')[0] ?: params.DB_USERNAME} -p'${params.DB_PASSWORD.split(',')[0] ?: params.DB_PASSWORD}' vpsie < /home/${params.ciuser}/${dbFileName}"
+        //                     """
+        //                     echo "✅ MySQL dump file ${dbFileName} restored successfully."
+        //                 } else {
+        //                     echo 'ℹ️ No MySQL dump file provided or file not found. Skipping restore step.'
+        //                 }
+        //             }
 
-                    // --- MongoDB Restore ---
-                    withFileParameter(name: 'MONGO_DB_FILE', allowNoFile: true) { uploadedMongoFile ->
-                        if (uploadedMongoFile && fileExists(uploadedMongoFile)) {
-                            def mongoFileName = uploadedMongoFile.tokenize('/').last()
-                            echo "📦 Found MongoDB dump file: ${uploadedMongoFile}"
+        //             // --- MongoDB Restore ---
+        //             withFileParameter(name: 'MONGO_DB_FILE', allowNoFile: true) { uploadedMongoFile ->
+        //                 if (uploadedMongoFile && fileExists(uploadedMongoFile)) {
+        //                     def mongoFileName = uploadedMongoFile.tokenize('/').last()
+        //                     echo "📦 Found MongoDB dump file: ${uploadedMongoFile}"
 
-                            echo '📤 Uploading MongoDB dump to DB Host1...'
-                            sh """
-                                scp -o StrictHostKeyChecking=no ${uploadedMongoFile} ${params.ciuser}@${DB_HOST1}:/home/${params.ciuser}/
-                                ls -lh ${uploadedMongoFile}
-                            """
+        //                     echo '📤 Uploading MongoDB dump to DB Host1...'
+        //                     sh """
+        //                         scp -o StrictHostKeyChecking=no ${uploadedMongoFile} ${params.ciuser}@${DB_HOST1}:/home/${params.ciuser}/
+        //                         ls -lh ${uploadedMongoFile}
+        //                     """
 
-                            echo '⏳ Waiting 15 seconds to ensure MongoDB dump is fully uploaded...'
-                            sleep time: 15, unit: 'SECONDS'
+        //                     echo '⏳ Waiting 15 seconds to ensure MongoDB dump is fully uploaded...'
+        //                     sleep time: 15, unit: 'SECONDS'
 
-                            echo '📥 Restoring MongoDB dump on DB Host1...'
-                            sh """
-                                ssh -o StrictHostKeyChecking=no ${params.ciuser}@${DB_HOST1} \\
-                                "mongorestore --username ${params.MONGO_DB_USERNAME} --password '${params.MONGO_DB_PASSWORD}' --authenticationDatabase admin --db vpsie /home/${params.ciuser}/${mongoFileName}"
-                            """
-                            echo "✅ MongoDB dump file ${mongoFileName} restored successfully."
-                        } else {
-                            echo 'ℹ️ No MongoDB dump file provided or file not found. Skipping restore step.'
-                        }
-                    }
-                }
-            }
-        }
+        //                     echo '📥 Restoring MongoDB dump on DB Host1...'
+        //                     sh """
+        //                         ssh -o StrictHostKeyChecking=no ${params.ciuser}@${DB_HOST1} \\
+        //                         "mongorestore --username ${params.MONGO_DB_USERNAME} --password '${params.MONGO_DB_PASSWORD}' --authenticationDatabase admin --db vpsie /home/${params.ciuser}/${mongoFileName}"
+        //                     """
+        //                     echo "✅ MongoDB dump file ${mongoFileName} restored successfully."
+        //                 } else {
+        //                     echo 'ℹ️ No MongoDB dump file provided or file not found. Skipping restore step.'
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         stage('Build and Configure Database On DNS Servers for the platform.') {
             steps {
