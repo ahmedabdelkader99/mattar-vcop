@@ -70,8 +70,8 @@ variable "haproxyCores" { type = number }
 
 
 ## TemplateSrv configuration
-variable "tempMem" { type = number }
-variable "tempCores" { type = number }
+//variable "tempMem" { type = number }
+//variable "tempCores" { type = number }
 ##apikey
 variable "apikey" { type = string }
 
