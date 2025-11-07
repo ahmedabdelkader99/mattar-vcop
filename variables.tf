@@ -29,7 +29,7 @@ variable "k8sStorageIP" { type = number }
 variable "dbStartIP" { type = number }
 variable "dnsStartIP" { type = number }
 variable "proxyIP" { type = number }
-variable "templatesSrvIP" { type = number }
+//variable "templatesSrvIP" { type = number }
 variable "backupSrvIP" { type = number }
 
 
