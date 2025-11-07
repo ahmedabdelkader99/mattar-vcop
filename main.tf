@@ -132,6 +132,7 @@ module "haproxy" {
 
 }
 
+/*
 module "templateSrv" {
   source = "./modules/srv"
 
@@ -154,4 +155,5 @@ module "templateSrv" {
   sshkeys = var.sshkeys
 
 }
+*/
 
