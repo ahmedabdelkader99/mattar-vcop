@@ -54,12 +54,12 @@ k8storageCores = 2                                       # CPU cores for Kuberne
 ## Database configuration
 dbMem          = "2048"                                  # Memory in MB for database VM
 dbCores        = "2"                                     # CPU cores for database VM
-dbCount        = "3"
+dbCount        = "0"
 
 ## DNS configuration
 dnsMem         = 2048                                    # Memory in MB for DNS server
 dnsCores       = 2                                       # CPU cores for DNS server
-dnsCount       = 3 
+dnsCount       = 0 
 
 ##temp
 tempMem        = 2048
