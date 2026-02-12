@@ -62,8 +62,8 @@ dnsCores       = 2                                       # CPU cores for DNS ser
 dnsCount       = 2 
 
 ##temp
-#tempMem        = 2048
-#tempCores      = 2
+//tempMem        = 2048
+//tempCores      = 2
 
 
 ## HAProxy configuration
