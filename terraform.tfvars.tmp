@@ -21,14 +21,14 @@ subnet         = "11.1.1"                                # Subnet for the VMs (e
 gateway        = "11.1.1.1"                              # Gateway IP for the subnet
 cidr           = 24                                      # CIDR notation for the subnet (e.g., /24)
 tag            = 32                                      # VLAN tag or network tag used in Proxmox
-k8sStartIP     = 4                                     # Starting IP address for Kubernetes nodes
-k8sProxyIP     = 11                                     # IP address for Kubernetes proxy
-k8sStorageIP   = 12                                     # IP address for Kubernetes storage
-dbStartIP      = 13                                     # Starting IP address for database VMs
-dnsStartIP     = 16                                     # Starting IP address for DNS VMs
-proxyIP        = 20                                     # IP address used by the HAproxy
+k8sStartIP     = 210                                     # Starting IP address for Kubernetes nodes
+k8sProxyIP     = 213                                     # IP address for Kubernetes proxy
+k8sStorageIP   = 214                                     # IP address for Kubernetes storage
+dbStartIP      = 215                                     # Starting IP address for database VMs
+dnsStartIP     = 218                                     # Starting IP address for DNS VMs
+proxyIP        = 221                                     # IP address used by the HAproxy
 //templatesSrvIP = 222                                    # IP address of the VM hosting templates
-backupSrvIP    = 21                                     # IP address of the backup server
+backupSrvIP    = 222                                     # IP address of the backup server
 sshkeys        = ""                                      # SSH public key(s) to inject into VMs
 ciuser         = "vpsie"                                 # Default username for cloud-init VMs
 
@@ -59,7 +59,7 @@ dbCount        = "3"
 ## DNS configuration
 dnsMem         = 2048                                    # Memory in MB for DNS server
 dnsCores       = 2                                       # CPU cores for DNS server
-dnsCount       = 3 
+dnsCount       = 2 
 
 ##temp
 tempMem        = 2048
