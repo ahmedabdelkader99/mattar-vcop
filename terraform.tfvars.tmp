@@ -26,9 +26,9 @@ k8sProxyIP     = 6                                     # IP address for Kubernet
 k8sStorageIP   = 7                                     # IP address for Kubernetes storage
 dbStartIP      = 8                                     # Starting IP address for database VMs
 dnsStartIP     = 9                                     # Starting IP address for DNS VMs
-proxyIP        = 10                                     # IP address used by the HAproxy
+proxyIP        = 11                                     # IP address used by the HAproxy
 //templatesSrvIP = 222                                    # IP address of the VM hosting templates
-backupSrvIP    = 11                                     # IP address of the backup server
+backupSrvIP    = 12                                     # IP address of the backup server
 sshkeys        = ""                                      # SSH public key(s) to inject into VMs
 ciuser         = "vpsie"                                 # Default username for cloud-init VMs
 
